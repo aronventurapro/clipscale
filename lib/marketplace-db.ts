@@ -18,7 +18,6 @@ interface DatabaseLike {
 }
 
 declare global {
- // eslint-disable-next-line no-var
  var __clipscaleDemoStore: DemoStore | undefined;
 }
 
