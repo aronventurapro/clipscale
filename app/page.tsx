@@ -65,12 +65,12 @@ function AnimatedNumber({ value, prefix = "", suffix = "", decimals = 0, duratio
   useEffect(() => {
     const node = ref.current;
     if (!node) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      const frame = requestAnimationFrame(() => setDisplay(value));
+      return () => cancelAnimationFrame(frame);
+    }
     const observer = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting) {
-        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) setDisplay(value);
-        else setVisible(true);
-        observer.disconnect();
-      }
+      if (entry.isIntersecting) { setVisible(true); observer.disconnect(); }
     }, { threshold: 0.35 });
     observer.observe(node);
     return () => observer.disconnect();
@@ -79,7 +79,6 @@ function AnimatedNumber({ value, prefix = "", suffix = "", decimals = 0, duratio
     if (!visible) return;
     let frame = 0;
     const started = performance.now();
-    const completion = window.setTimeout(() => setDisplay(value), duration + 120);
     const tick = (now: number) => {
       const progress = Math.min(1, (now - started) / duration);
       const next = value * (1 - Math.pow(1 - progress, 4));
@@ -87,7 +86,7 @@ function AnimatedNumber({ value, prefix = "", suffix = "", decimals = 0, duratio
       if (progress < 1) frame = requestAnimationFrame(tick);
     };
     frame = requestAnimationFrame(tick);
-    return () => { cancelAnimationFrame(frame); window.clearTimeout(completion); };
+    return () => cancelAnimationFrame(frame);
   }, [decimals, duration, value, visible]);
   return <span ref={ref} className="cs5-count" aria-label={`${prefix}${value.toLocaleString("fr-FR", { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}${suffix}`}>{prefix}{display.toLocaleString("fr-FR", { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}{suffix}</span>;
 }
@@ -176,9 +175,9 @@ function Landing({ launch }: { launch: (plan?: string, requireAccount?: boolean)
 
       <section className="cs3-bento"><article className="cs3-bento-large"><span>POUR LES AGENCES</span><h2>Plus de capacité.<br />Moins de coordination.</h2><p>Votre équipe voit ses priorités. Vos clients voient l’avancement. Vous gardez la maîtrise.</p><div><b><strong><AnimatedNumber value={1} /></strong><small>cockpit</small></b><b><strong><AnimatedNumber value={10} /></strong><small>réseaux</small></b><b><strong><AnimatedNumber value={0} /></strong><small>tableur</small></b></div></article><article className="cs3-bento-dark"><span>VIRALITÉ</span><div className="cs3-mini-ring"><AnimatedNumber value={87} /></div><h3>Comprenez avant de publier.</h3><p>Accroche, format, durée et qualité expliqués clairement.</p></article><article className="cs3-bento-purple"><span>DIFFUSION</span><div className="cs3-bento-icons">{socialPlatforms.slice(0, 4).map((item) => <SocialIcon platform={item} key={item.id} />)}</div><h3>Publiez sans vous répéter.</h3><p>Une préparation unique pour tous vos canaux.</p></article></section>
 
-      <section className="cs3-video-demo" id="demo-video">
+      <section className="cs3-video-demo">
         <div className="cs3-video-copy"><div className="cs3-section-tag">30 SECONDES POUR TOUT COMPRENDRE</div><h2>Voyez ClipScale<br /><em>prendre vie.</em></h2><p>Une démonstration motion design, de votre clip brut à une campagne prête pour chaque plateforme.</p><div className="cs5-motion-steps">{motionSteps.map((step) => <div key={step.number}><b>{step.number}</b><span><strong>{step.label}</strong><small>{step.detail}</small></span></div>)}</div><button type="button" onClick={() => launch()}>Essayer le cockpit interactif →</button></div>
-        <div className="cs3-video-stage"><div className="cs3-video-halo" aria-hidden="true"/><div className="cs3-video-frame"><video controls autoPlay muted loop playsInline preload="auto" aria-label="Démonstration animée de ClipScale en 30 secondes"><source src="/clipscale-demo.mp4" type="video/mp4" /></video><span><i/> MOTION DEMO · 00:30</span><div className="cs5-video-badge score"><small>SCORE VIRAL</small><b><AnimatedNumber value={87} /></b></div><div className="cs5-video-badge ready"><i>✓</i><span><b>10 variantes prêtes</b><small>Adaptées automatiquement</small></span></div></div></div>
+        <div className="cs3-video-stage"><div className="cs3-video-halo" aria-hidden="true"/><div className="cs3-video-frame"><video controls autoPlay muted loop playsInline preload="auto" poster="/clipscale-motion-poster.jpg" aria-label="Démonstration animée de ClipScale en 30 secondes"><source src="/clipscale-motion-demo.mp4" type="video/mp4" /></video><span><i/> MOTION DEMO · 00:30</span><div className="cs5-video-badge score"><small>SCORE VIRAL</small><b><AnimatedNumber value={87} /></b></div><div className="cs5-video-badge ready"><i>✓</i><span><b>10 variantes prêtes</b><small>Adaptées automatiquement</small></span></div></div></div>
       </section>
 
       <section className="cs3-results"><div className="cs3-section-tag">RÉSULTATS ATTENDUS</div><h2>Moins d’opérations.<br />Plus de contenu publié.</h2><div className="cs3-results-grid"><article><strong><AnimatedNumber value={68} prefix="−" suffix="%" duration={1600}/></strong><p>de temps consacré à la diffusion</p><small>Scénario agence · 5 clients</small></article><article><strong><AnimatedNumber value={3} prefix="×" duration={1300}/></strong><p>plus de variantes publiées</p><small>Scénario créateur · 4 réseaux</small></article><article><strong><AnimatedNumber value={24} prefix="+" suffix="%" duration={1500}/></strong><p>de vues hebdomadaires</p><small>Projection issue du tableau de bord démo</small></article></div><p className="cs3-results-disclaimer">Ces chiffres illustrent des scénarios de démonstration. Les résultats réels dépendent du contenu, de l’audience et des plateformes.</p></section>
