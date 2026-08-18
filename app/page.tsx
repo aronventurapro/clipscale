@@ -121,7 +121,7 @@ const additionalCreators = [
   { image: "/creator-results/collaboration-3.webp", position: "center 35%" },
 ];
 
-function Landing({ launch }: { launch: (plan?: string, requireAccount?: boolean) => void }) {
+function Landing({ launch, theme, toggleTheme }: { launch: (plan?: string, requireAccount?: boolean) => void; theme: "dark" | "light"; toggleTheme: () => void }) {
   const [spotlight, setSpotlight] = useState<"analyse" | "publication" | "pilotage">("analyse");
   const [activeCreator, setActiveCreator] = useState(0);
   const [openFaq, setOpenFaq] = useState(0);
@@ -142,7 +142,7 @@ function Landing({ launch }: { launch: (plan?: string, requireAccount?: boolean)
       <header className="cs3-header">
         <a href="#top" aria-label="Accueil ClipScale"><Logo /></a>
         <nav aria-label="Navigation principale"><a href="#product">Produit</a><a href="#workflow">Fonctionnement</a><a href="#features">Fonctionnalités</a><a href="#pricing">Tarifs</a></nav>
-        <button type="button" className="cs3-nav-cta" onClick={() => launch("Scale", true)}>Se connecter <span aria-hidden="true">↗</span></button>
+        <div className="cs-theme-actions"><button type="button" className="cs-theme-toggle" onClick={toggleTheme} aria-label={theme === "dark" ? "Activer le mode clair" : "Activer le mode sombre"} title={theme === "dark" ? "Mode clair" : "Mode sombre"}><span aria-hidden="true">{theme === "dark" ? "☀" : "☾"}</span></button><button type="button" className="cs3-nav-cta" onClick={() => launch("Scale", true)}>Se connecter <span aria-hidden="true">↗</span></button></div>
       </header>
 
       <section className="cs3-hero" id="main-content">
@@ -271,7 +271,7 @@ function Onboarding({ userId, plan, done }: { userId: string; plan: string; done
   return <div className="cs4-onboarding"><header><Logo/><span>Étape {step} sur 4</span></header><div className="cs4-onboarding-progress"><i style={{width:`${step * 25}%`}}/></div><main>{step === 1 && <><span>BIENVENUE SUR CLIPSCALE</span><h1>Configurons votre espace.</h1><p>Quelques réponses suffisent pour personnaliser votre cockpit.</p><label>Nom de votre espace<input value={workspace} onChange={(e) => setWorkspace(e.target.value)} /></label></>}{step === 2 && <><span>VOTRE ACTIVITÉ</span><h1>Quel est votre profil ?</h1><p>Nous adapterons les priorités et les recommandations.</p><div className="cs4-choice-grid">{["Agence","Créateur","Freelance","Équipe marketing"].map((item) => <button className={role === item ? "active" : ""} onClick={() => setRole(item)} key={item}>{item}</button>)}</div></>}{step === 3 && <><span>VOTRE ÉQUIPE</span><h1>Combien êtes-vous ?</h1><p>Vous pourrez inviter les autres membres plus tard.</p><div className="cs4-choice-grid">{["Je travaille seul","1 à 3 personnes","4 à 10 personnes","Plus de 10"].map((item) => <button className={teamSize === item ? "active" : ""} onClick={() => setTeamSize(item)} key={item}>{item}</button>)}</div></>}{step === 4 && <><span>OBJECTIF PRINCIPAL</span><h1>Que voulez-vous améliorer ?</h1><p>Votre plan {plan} sera préparé autour de cet objectif.</p><div className="cs4-choice-grid">{["Publier plus vite","Améliorer la viralité","Gérer mes clients","Suivre les performances"].map((item) => <button className={goal === item ? "active" : ""} onClick={() => setGoal(item)} key={item}>{item}</button>)}</div></>}</main><footer>{step > 1 ? <button onClick={() => setStep(step - 1)}>← Retour</button> : <span/>}<button className="cs2-button" onClick={() => step < 4 ? setStep(step + 1) : finish()} disabled={saving || (step === 1 && !workspace.trim())}>{saving ? "Création…" : step < 4 ? "Continuer →" : "Ouvrir mon cockpit →"}</button></footer></div>;
 }
 
-function AppShell({ exit, plan, userId, signOut }: { exit: () => void; plan: string; userId: string | null; signOut: () => void }) {
+function AppShell({ exit, plan, userId, signOut, theme, toggleTheme }: { exit: () => void; plan: string; userId: string | null; signOut: () => void; theme: "dark" | "light"; toggleTheme: () => void }) {
   const [view, setView] = useState<View>("overview");
   const [missions, setMissions] = useState(initialMissions);
   const [clips, setClips] = useState(initialClips);
@@ -403,7 +403,7 @@ function AppShell({ exit, plan, userId, signOut }: { exit: () => void; plan: str
       </aside>
 
       <main className="cs2-workspace">
-        <header className="cs2-app-header"><div className="cs2-mobile-brand"><Logo /></div><span className="cs2-demo-pill">● MODE DÉMO</span><span className="cs2-plan-pill">✦ Plan {plan}</span><div className="cs2-header-actions"><button aria-label="Aide">?</button><div className="cs2-avatar">AV</div></div></header>
+        <header className="cs2-app-header"><div className="cs2-mobile-brand"><Logo /></div><span className="cs2-demo-pill">● MODE DÉMO</span><span className="cs2-plan-pill">✦ Plan {plan}</span><div className="cs2-header-actions"><button className="cs-theme-toggle" onClick={toggleTheme} aria-label={theme === "dark" ? "Activer le mode clair" : "Activer le mode sombre"} title={theme === "dark" ? "Mode clair" : "Mode sombre"}><span aria-hidden="true">{theme === "dark" ? "☀" : "☾"}</span></button><button aria-label="Aide">?</button><div className="cs2-avatar">AV</div></div></header>
         <div className="cs2-mobile-nav">{navItems.slice(0, 5).map((item) => <button key={item.id} className={view === item.id ? "active" : ""} onClick={() => changeView(item.id)}><span>{item.icon}</span>{item.label === "Vue d’ensemble" ? "Accueil" : item.label}</button>)}</div>
 
         <section className="cs2-page">
@@ -539,7 +539,10 @@ export default function Home() {
   const [userId, setUserId] = useState<string | null>(null);
   const [showAuth, setShowAuth] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
   useEffect(() => {
+    const savedTheme = window.localStorage.getItem("clipscale-theme");
+    if (savedTheme === "light" || savedTheme === "dark") setTheme(savedTheme);
     supabase.auth.getSession().then(({ data }) => setUserId(data.session?.user.id ?? null));
     const { data } = supabase.auth.onAuthStateChange((_event, session) => setUserId(session?.user.id ?? null));
     return () => data.subscription.unsubscribe();
@@ -555,5 +558,6 @@ export default function Home() {
     if (userId) await openAuthenticatedApp(userId); else setShowAuth(true);
   };
   const signOut = async () => { await supabase.auth.signOut(); setUserId(null); setInApp(false); };
-  return <>{showOnboarding && userId ? <Onboarding userId={userId} plan={selectedPlan} done={() => { setShowOnboarding(false); setInApp(true); }} /> : inApp ? <AppShell exit={() => setInApp(false)} plan={selectedPlan} userId={userId} signOut={signOut} /> : <Landing launch={launch} />}{showAuth && <AuthModal plan={selectedPlan} close={() => setShowAuth(false)} authenticated={openAuthenticatedApp} />}</>;
+  const toggleTheme = () => setTheme((current) => { const next = current === "dark" ? "light" : "dark"; window.localStorage.setItem("clipscale-theme", next); return next; });
+  return <div className={`cs-theme cs-theme-${theme}`}>{showOnboarding && userId ? <Onboarding userId={userId} plan={selectedPlan} done={() => { setShowOnboarding(false); setInApp(true); }} /> : inApp ? <AppShell exit={() => setInApp(false)} plan={selectedPlan} userId={userId} signOut={signOut} theme={theme} toggleTheme={toggleTheme} /> : <Landing launch={launch} theme={theme} toggleTheme={toggleTheme} />}{showAuth && <AuthModal plan={selectedPlan} close={() => setShowAuth(false)} authenticated={openAuthenticatedApp} />}</div>;
 }
