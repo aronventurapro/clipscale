@@ -110,7 +110,7 @@ const motionSteps = [
 
 const creatorResults = [
   { name: "Yomi Denzel", initials: "YD", views: 4_500_000, compactValue: 4.5, compactSuffix: " M", share: 100, accent: "#a991ff" },
-  { name: "Mauno", initials: "MA", views: 2_500_000, compactValue: 2.5, compactSuffix: " M", share: 56, accent: "#7d9cff" },
+  { name: "Maouno", initials: "MA", views: 2_500_000, compactValue: 2.5, compactSuffix: " M", share: 56, accent: "#7d9cff" },
   { name: "Keo", initials: "KE", views: 1_200_000, compactValue: 1.2, compactSuffix: " M", share: 27, accent: "#64d7b2" },
   { name: "Blyaat", initials: "BL", views: 79_000, compactValue: 79, compactSuffix: " k", share: 8, accent: "#f0a66a" },
 ];
