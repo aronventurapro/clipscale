@@ -5,7 +5,7 @@ import { SiBluesky, SiFacebook, SiInstagram, SiLinkedin, SiPinterest, SiSnapchat
 import { supabase } from "../lib/supabase";
 import "./clipscale-v2.css";
 
-type View = "overview" | "missions" | "clips" | "virality" | "publish" | "team" | "settings";
+type View = "overview" | "missions" | "clips" | "virality" | "scripts" | "publish" | "team" | "admin" | "settings";
 type MissionStatus = "En production" | "À valider" | "Planifiée";
 type VideoMeta = { name: string; duration: number; width: number; height: number; size: number };
 type ViralAnalysis = { score: number; verdict: string; summary: string; factors: { label: string; score: number; detail: string }[]; improvements: string[] };
@@ -49,8 +49,10 @@ const navItems: { id: View; label: string; icon: string }[] = [
   { id: "missions", label: "Missions", icon: "▣" },
   { id: "clips", label: "Clips", icon: "▶" },
   { id: "virality", label: "Viralité", icon: "↗" },
+  { id: "scripts", label: "Studio scripts", icon: "✦" },
   { id: "publish", label: "Publier", icon: "↑" },
   { id: "team", label: "Équipe", icon: "◎" },
+  { id: "admin", label: "Administration", icon: "▦" },
   { id: "settings", label: "Réglages", icon: "⚙" },
 ];
 
@@ -214,7 +216,7 @@ function Landing({ launch, theme, toggleTheme }: { launch: (plan?: string, requi
       <section className="cs3-faq"><div><div className="cs3-section-tag">QUESTIONS FRÉQUENTES</div><h2>Tout ce qu’il faut savoir<br />avant de démarrer.</h2><p>Une question qui manque ? Le support est disponible directement dans l’application.</p></div><div className="cs3-faq-list">{[["ClipScale publie-t-il réellement sur mes réseaux ?","La connexion officielle de chaque plateforme sera nécessaire. ClipScale prépare déjà les variantes et le calendrier ; l’envoi réel sera activé réseau par réseau après validation OAuth."],["Mes vidéos sont-elles sécurisées ?","Oui. Le stockage est privé et chaque fichier est isolé par utilisateur. Les autres clients ne peuvent pas accéder à vos vidéos."],["Puis-je essayer sans payer ?","Oui. Votre espace démarre avec 14 jours d’essai. Stripe sera connecté à la dernière étape avant l’ouverture des abonnements payants."],["Le score viral garantit-il des vues ?","Non. Il s’agit d’une estimation qui aide à améliorer le format, l’accroche et la rétention. Aucun outil ne peut garantir la viralité."],["Puis-je gérer plusieurs clients ?","Oui, l’offre Agency prévoit plusieurs membres, des espaces clients et un suivi centralisé des validations."]].map(([question,answer],index) => <article className={openFaq === index ? "open" : ""} key={question}><button type="button" aria-expanded={openFaq === index} onClick={() => setOpenFaq(openFaq === index ? -1 : index)}><span>{question}</span><b>{openFaq === index ? "−" : "+"}</b></button>{openFaq === index && <p>{answer}</p>}</article>)}</div></section>
 
       <section className="cs3-final"><div className="cs3-final-orb" /><span>PRÊT À SIMPLIFIER VOTRE PRODUCTION ?</span><h2>Votre prochaine vidéo mérite<br /><em>mieux qu’un tableur.</em></h2><p>Créez votre espace puis suivez le parcours guidé jusqu’à votre première publication.</p><button type="button" className="cs3-primary" onClick={() => launch("Scale", true)}>Créer mon espace ClipScale <b aria-hidden="true">→</b></button><small>14 jours d’essai · Aucun paiement maintenant</small></section>
-      <footer className="cs3-footer"><Logo /><p>Le cockpit de croissance des agences de clipping.</p><div><a href="/mentions-legales">Mentions légales</a><a href="/confidentialite">Confidentialité</a><span>© 2026 ClipScale</span></div></footer>
+      <footer className="cs3-footer"><Logo /><p>Le cockpit de croissance des agences de clipping.</p><div><a href="/conditions">CGV</a><a href="/mentions-legales">Mentions légales</a><a href="/confidentialite">Confidentialité</a><span>© 2026 ClipScale</span></div></footer>
     </main>
   );
 }
@@ -299,8 +301,36 @@ function AppShell({ exit, plan, userId, signOut, theme, toggleTheme }: { exit: (
   const [supportSubject, setSupportSubject] = useState("");
   const [supportMessage, setSupportMessage] = useState("");
   const [supportSending, setSupportSending] = useState(false);
+  const [scriptTopic, setScriptTopic] = useState("Comment transformer une seule vidéo longue en 20 clips performants");
+  const [scriptAudience, setScriptAudience] = useState("Créateurs et agences de contenu");
+  const [scriptGoal, setScriptGoal] = useState("Générer des demandes de démonstration");
+  const [scriptTone, setScriptTone] = useState("Direct et premium");
+  const [scriptDuration, setScriptDuration] = useState("60 secondes");
+  const [scriptStructure, setScriptStructure] = useState("Problème → tension → solution → preuve → CTA");
+  const [scriptCta, setScriptCta] = useState("Teste ClipScale gratuitement");
+  const [scriptReferences, setScriptReferences] = useState("Yomi Denzel, Ali Abdaal, chaîne Think Media");
+  const [scriptKeywords, setScriptKeywords] = useState("clipping vidéo, contenu court, automatisation, créateur");
+  const [generatedScript, setGeneratedScript] = useState<null | { title: string; hook: string; body: string[]; description: string; seoTitle: string; tags: string[] }>(null);
   const filteredClips = useMemo(() => clipFilter === "Tous" ? clips : clips.filter((clip) => clip.status === clipFilter), [clips, clipFilter]);
   const notify = (message: string) => { setToast(message); window.setTimeout(() => setToast(""), 2600); };
+  const generateScript = () => {
+    const mainKeyword = scriptKeywords.split(",")[0]?.trim() || scriptTopic;
+    setGeneratedScript({
+      title: `${scriptTopic} : la méthode complète en ${scriptDuration}`,
+      hook: `Tu perds encore des heures à republier le même contenu ? Voici comment transformer une seule idée en une machine à contenu — sans sacrifier la qualité.`,
+      body: [
+        `0–5 s · ACCROCHE — « Une seule vidéo peut alimenter toute ta semaine. Le problème, ce n’est pas ton contenu : c’est ton système. »`,
+        `5–18 s · PROBLÈME — Montre le temps perdu entre le montage, les formats, les légendes et les publications. Adresse-toi directement à ${scriptAudience.toLowerCase()}.`,
+        `18–38 s · SOLUTION — Présente une méthode en trois temps : détecter les moments forts, adapter chaque extrait au réseau, puis programmer la diffusion depuis un seul cockpit.`,
+        `38–50 s · PREUVE — Appuie le propos avec un résultat concret et une capture du tableau de bord. Inspire-toi du rythme et des transitions observés chez ${scriptReferences || "les chaînes de référence"}, sans reproduire leur texte ni leur identité.`,
+        `50–${scriptDuration.replace(" secondes", "")} s · CTA — « ${scriptCta}. » Affiche le bénéfice final à l’écran et termine sur une action unique.`,
+      ],
+      description: `${scriptTopic}. Dans cette vidéo pensée pour ${scriptAudience.toLowerCase()}, découvre une méthode concrète pour ${scriptGoal.toLowerCase()}. Structure : ${scriptStructure}. Références créatives analysées : ${scriptReferences || "aucune"}.`,
+      seoTitle: `${mainKeyword.charAt(0).toUpperCase() + mainKeyword.slice(1)} : méthode 2026 pour publier plus vite`,
+      tags: scriptKeywords.split(",").map((item) => item.trim()).filter(Boolean).slice(0, 8),
+    });
+    notify("Script personnalisé généré");
+  };
   const changeView = (next: View) => { setView(next); setShowCreate(false); };
   const addMission = () => { setMissions((current) => [...current, { id: Date.now(), client: "Nouveau client", title: "Nouvelle mission", clips: "0 / 6", due: "À définir", status: "Planifiée", tone: "green" }]); setShowCreate(false); setView("missions"); notify("Mission créée dans la démo"); };
   const advanceClip = (id: number) => { setClips((current) => current.map((clip) => clip.id === id ? { ...clip, status: clip.status === "Montage" ? "À valider" : clip.status === "À valider" ? "Approuvé" : clip.status === "Approuvé" ? "Publié" : clip.status } : clip)); notify("Statut du clip mis à jour"); };
@@ -404,7 +434,7 @@ function AppShell({ exit, plan, userId, signOut, theme, toggleTheme }: { exit: (
 
       <main className="cs2-workspace">
         <header className="cs2-app-header"><div className="cs2-mobile-brand"><Logo /></div><span className="cs2-demo-pill">● MODE DÉMO</span><span className="cs2-plan-pill">✦ Plan {plan}</span><div className="cs2-header-actions"><button className="cs-theme-toggle" onClick={toggleTheme} aria-label={theme === "dark" ? "Activer le mode clair" : "Activer le mode sombre"} title={theme === "dark" ? "Mode clair" : "Mode sombre"}><span aria-hidden="true">{theme === "dark" ? "☀" : "☾"}</span></button><button aria-label="Aide">?</button><div className="cs2-avatar">AV</div></div></header>
-        <div className="cs2-mobile-nav">{navItems.slice(0, 5).map((item) => <button key={item.id} className={view === item.id ? "active" : ""} onClick={() => changeView(item.id)}><span>{item.icon}</span>{item.label === "Vue d’ensemble" ? "Accueil" : item.label}</button>)}</div>
+        <div className="cs2-mobile-nav">{navItems.filter((item) => ["overview","scripts","virality","publish","settings"].includes(item.id)).map((item) => <button key={item.id} className={view === item.id ? "active" : ""} onClick={() => changeView(item.id)}><span>{item.icon}</span>{item.label === "Vue d’ensemble" ? "Accueil" : item.label === "Studio scripts" ? "Scripts" : item.label}</button>)}</div>
 
         <section className="cs2-page">
           {view === "overview" && <>
@@ -510,6 +540,14 @@ function AppShell({ exit, plan, userId, signOut, theme, toggleTheme }: { exit: (
             </div>
           </>}
 
+          {view === "scripts" && <>
+            <div className="cs2-page-title"><div><span>STUDIO IA · SCRIPT PERSONNALISÉ</span><h1>Transformez une idée en vidéo complète.</h1><p>Configurez le sujet, le style, les références et l’objectif. ClipScale prépare le titre, l’accroche, le script, la description et le référencement.</p></div><button className="cs2-button" onClick={generateScript}>✦ Générer le script</button></div>
+            <div className="cs7-script-layout"><section className="cs2-panel cs7-script-form"><header><span>01</span><div><h2>Direction créative</h2><p>Plus le brief est précis, plus le résultat est cohérent avec votre univers.</p></div></header><label>Sujet de la vidéo<textarea value={scriptTopic} onChange={(e) => setScriptTopic(e.target.value)} /></label><div className="cs7-fields"><label>Audience<input value={scriptAudience} onChange={(e) => setScriptAudience(e.target.value)} /></label><label>Objectif<input value={scriptGoal} onChange={(e) => setScriptGoal(e.target.value)} /></label><label>Ton<select value={scriptTone} onChange={(e) => setScriptTone(e.target.value)}><option>Direct et premium</option><option>Éducatif et rassurant</option><option>Énergique et provocateur</option><option>Storytelling cinématique</option><option>Humoristique et naturel</option></select></label><label>Durée<select value={scriptDuration} onChange={(e) => setScriptDuration(e.target.value)}><option>30 secondes</option><option>45 secondes</option><option>60 secondes</option><option>90 secondes</option><option>3 minutes</option><option>8 minutes</option></select></label></div><label>Structure<select value={scriptStructure} onChange={(e) => setScriptStructure(e.target.value)}><option>Problème → tension → solution → preuve → CTA</option><option>Accroche → histoire → leçon → CTA</option><option>Liste → exemples → synthèse → CTA</option><option>Opinion forte → arguments → objection → CTA</option></select></label><label>Chaînes et créateurs de référence<textarea value={scriptReferences} onChange={(e) => setScriptReferences(e.target.value)} placeholder="Noms ou liens YouTube/TikTok. Utilisés comme références de rythme et de structure, jamais pour copier." /><small>ClipScale s’inspire des caractéristiques éditoriales, sans reproduire les textes ni l’identité des créateurs.</small></label><label>Mots-clés SEO<input value={scriptKeywords} onChange={(e) => setScriptKeywords(e.target.value)} /></label><label>Appel à l’action<input value={scriptCta} onChange={(e) => setScriptCta(e.target.value)} /></label><button className="cs2-button cs7-generate" onClick={generateScript}>✦ Générer une version personnalisée</button></section>
+            <section className="cs2-panel cs7-script-output" aria-live="polite">{generatedScript ? <><div className="cs7-output-top"><span>VERSION 01 · {scriptTone.toUpperCase()}</span><button onClick={() => navigator.clipboard?.writeText([generatedScript.title,generatedScript.hook,...generatedScript.body,generatedScript.description].join("\n\n")).then(() => notify("Script copié"))}>Copier tout</button></div><article><small>TITRE DE LA VIDÉO</small><h2>{generatedScript.title}</h2></article><article className="hook"><small>ACCROCHE</small><p>{generatedScript.hook}</p></article><article><small>SCRIPT DÉCOUPÉ PAR SCÈNE</small><div className="cs7-scenes">{generatedScript.body.map((line,index) => <p key={line}><b>0{index + 1}</b><span>{line}</span></p>)}</div></article><article><small>TITRE SEO</small><p>{generatedScript.seoTitle}</p></article><article><small>DESCRIPTION RÉFÉRENCÉE</small><p>{generatedScript.description}</p></article><div className="cs7-tags">{generatedScript.tags.map((tag) => <span key={tag}>#{tag.replaceAll(" ", "")}</span>)}</div></> : <div className="cs7-script-empty"><span>✦</span><h2>Votre script apparaîtra ici.</h2><p>Vous obtiendrez un résultat structuré, modifiable et prêt à tourner.</p><ul><li>Un titre orienté clic</li><li>Une accroche pour les premières secondes</li><li>Un découpage scène par scène</li><li>Une description et des mots-clés SEO</li></ul></div>}</section></div>
+          </>}
+
+          {view === "admin" && <><div className="cs2-page-title"><div><span>CENTRE DE CONTRÔLE</span><h1>Administration</h1><p>Pilotez les clients, les abonnements, les quotas, les connexions et la santé du produit.</p></div><span className="cs7-admin-live">● Système opérationnel</span></div><div className="cs7-admin-kpis">{[["Clients actifs","128","+12 ce mois"],["Revenu mensuel","9 840 €","+18,4 %"],["Vidéos traitées","18 420","72 % du quota"],["Tickets ouverts","7","2 prioritaires"]].map(([label,value,detail]) => <article key={label}><span>{label}</span><strong>{value}</strong><small>{detail}</small></article>)}</div><div className="cs7-admin-grid"><section className="cs2-panel"><header><h2>Intégrations de production</h2><span>Configuration</span></header>{[["Instagram + Facebook","Meta OAuth","Identifiants requis"],["YouTube","Google OAuth","Identifiants requis"],["TikTok","TikTok Login Kit","Identifiants requis"],["LinkedIn","LinkedIn OAuth","Identifiants requis"],["Stripe","Abonnements + factures","Connexion requise"],["Analyse IA","Vercel AI Gateway","Clé requise"]].map(([name,type,status]) => <div className="cs7-integration" key={name}><i>○</i><span><b>{name}</b><small>{type}</small></span><em>{status}</em></div>)}</section><section className="cs2-panel"><header><h2>Quotas par offre</h2><span>Application automatique</span></header>{plans.map((item,index) => <div className="cs7-quota" key={item.name}><span><b>{item.name}</b><small>{item.price} € / mois</small></span><i><b style={{width:`${[34,68,88][index]}%`}} /></i><strong>{["30 clips","150 clips","Illimité"][index]}</strong></div>)}</section><section className="cs2-panel cs7-admin-wide"><header><h2>Suivi produit</h2><span>Dernières 24 h</span></header><div className="cs7-health">{[["Disponibilité","99,98 %","good"],["Temps de réponse","184 ms","good"],["Erreurs API","0,12 %","good"],["Conversion essai","8,7 %","up"]].map(([label,value,tone]) => <div key={label} className={tone}><span>{label}</span><strong>{value}</strong><i /></div>)}</div></section></div></>}
+
           {view === "team" && <>
             <div className="cs2-page-title"><div><span>COLLABORATION</span><h1>Équipe</h1><p>Répartissez la charge avant qu’elle ne devienne un problème.</p></div><button className="cs2-button" onClick={() => notify("Invitation simulée — mode démo")}>Inviter un membre</button></div>
             <div className="cs2-team-grid">{[["Lina Morel", "LM", "Monteuse", 4, 75, "Disponible jeudi"], ["Yanis Cohen", "YC", "Clippeur", 3, 55, "Disponible demain"], ["Maya Laurent", "ML", "Clippeuse", 5, 90, "Charge élevée"]].map(([name, initials, role, tasks, load, availability]) => <article className="cs2-team-card" key={String(name)}><div className="cs2-team-avatar">{initials}</div><h3>{name}</h3><p>{role}</p><div><span>{tasks} clips actifs</span><strong>{load}%</strong></div><div className="cs2-load"><i style={{ width: `${load}%` }} /></div><small>{availability}</small></article>)}</div>
@@ -540,9 +578,12 @@ export default function Home() {
   const [showAuth, setShowAuth] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const [cookieChoice, setCookieChoice] = useState<"accepted" | "essential" | null>(null);
   useEffect(() => {
     const savedTheme = window.localStorage.getItem("clipscale-theme");
     if (savedTheme === "light" || savedTheme === "dark") setTheme(savedTheme);
+    const savedCookies = window.localStorage.getItem("clipscale-cookie-choice");
+    if (savedCookies === "accepted" || savedCookies === "essential") setCookieChoice(savedCookies);
     supabase.auth.getSession().then(({ data }) => setUserId(data.session?.user.id ?? null));
     const { data } = supabase.auth.onAuthStateChange((_event, session) => setUserId(session?.user.id ?? null));
     return () => data.subscription.unsubscribe();
@@ -559,5 +600,6 @@ export default function Home() {
   };
   const signOut = async () => { await supabase.auth.signOut(); setUserId(null); setInApp(false); };
   const toggleTheme = () => setTheme((current) => { const next = current === "dark" ? "light" : "dark"; window.localStorage.setItem("clipscale-theme", next); return next; });
-  return <div className={`cs-theme cs-theme-${theme}`}>{showOnboarding && userId ? <Onboarding userId={userId} plan={selectedPlan} done={() => { setShowOnboarding(false); setInApp(true); }} /> : inApp ? <AppShell exit={() => setInApp(false)} plan={selectedPlan} userId={userId} signOut={signOut} theme={theme} toggleTheme={toggleTheme} /> : <Landing launch={launch} theme={theme} toggleTheme={toggleTheme} />}{showAuth && <AuthModal plan={selectedPlan} close={() => setShowAuth(false)} authenticated={openAuthenticatedApp} />}</div>;
+  const chooseCookies = (choice: "accepted" | "essential") => { window.localStorage.setItem("clipscale-cookie-choice", choice); setCookieChoice(choice); };
+  return <div className={`cs-theme cs-theme-${theme}`}>{showOnboarding && userId ? <Onboarding userId={userId} plan={selectedPlan} done={() => { setShowOnboarding(false); setInApp(true); }} /> : inApp ? <AppShell exit={() => setInApp(false)} plan={selectedPlan} userId={userId} signOut={signOut} theme={theme} toggleTheme={toggleTheme} /> : <Landing launch={launch} theme={theme} toggleTheme={toggleTheme} />}{showAuth && <AuthModal plan={selectedPlan} close={() => setShowAuth(false)} authenticated={openAuthenticatedApp} />}{!cookieChoice && <aside className="cs7-cookie" aria-label="Préférences de confidentialité"><div><b>Vos choix, clairement.</b><p>Les éléments essentiels assurent le fonctionnement de ClipScale. Les mesures d’audience optionnelles nous aident à améliorer le produit.</p><a href="/confidentialite">En savoir plus</a></div><div><button onClick={() => chooseCookies("essential")}>Essentiels uniquement</button><button className="cs2-button" onClick={() => chooseCookies("accepted")}>Tout accepter</button></div></aside>}</div>;
 }
