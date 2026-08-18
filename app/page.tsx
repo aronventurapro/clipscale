@@ -50,61 +50,62 @@ function Logo() {
 }
 
 function Landing({ launch }: { launch: () => void }) {
+  const [spotlight, setSpotlight] = useState<"analyse" | "publication" | "pilotage">("analyse");
   return (
-    <main className="cs2-landing">
-      <header className="cs2-site-header">
+    <main className="cs3-landing">
+      <div className="cs3-noise" aria-hidden="true" />
+      <header className="cs3-header">
         <a href="#top" aria-label="Accueil ClipScale"><Logo /></a>
-        <nav aria-label="Navigation principale">
-          <a href="#workflow">Comment ça marche</a><a href="#audiences">Pour qui</a><a href="#beta">Bêta</a>
-        </nav>
-        <button className="cs2-button cs2-button-small" onClick={launch}>Explorer la démo</button>
+        <nav aria-label="Navigation principale"><a href="#product">Produit</a><a href="#workflow">Fonctionnement</a><a href="#features">Fonctionnalités</a></nav>
+        <button className="cs3-nav-cta" onClick={launch}>Essayer la démo <span>↗</span></button>
       </header>
 
-      <section className="cs2-hero" id="top">
-        <div className="cs2-eyebrow"><span /> Conçu pour les agences de clipping</div>
-        <h1>Pilotez vos clips.<br /><em>Sans le chaos.</em></h1>
-        <p>Missions, clippeurs, validations et suivi client dans un espace simple. Remplacez les tableurs, les messages éparpillés et les relances manuelles.</p>
-        <div className="cs2-hero-actions">
-          <button className="cs2-button" onClick={launch}>Voir le produit <span>→</span></button>
-          <a className="cs2-text-link" href="#workflow">Découvrir le fonctionnement</a>
+      <section className="cs3-hero" id="top">
+        <div className="cs3-orb cs3-orb-one" aria-hidden="true" /><div className="cs3-orb cs3-orb-two" aria-hidden="true" />
+        <div className="cs3-hero-copy">
+          <div className="cs3-kicker"><span><i /> NOUVEAU</span> Analyse virale & publication multicanale <b>→</b></div>
+          <h1>Une vidéo.<br /><em>Partout.</em> Plus vite.</h1>
+          <p>ClipScale réunit votre production, estime le potentiel viral de vos clips et prépare leur diffusion sur tous vos réseaux depuis un seul cockpit.</p>
+          <div className="cs3-actions"><button className="cs3-primary" onClick={launch}>Explorer ClipScale <span>→</span></button><a href="#product">Voir comment ça marche <i>↓</i></a></div>
+          <div className="cs3-reassurance"><span>✓ Démo immédiate</span><span>✓ Sans carte bancaire</span><span>✓ Conçu pour les agences</span></div>
         </div>
-        <small>Démo interactive · Aucun paiement demandé</small>
-      </section>
 
-      <section className="cs2-product-frame" aria-label="Aperçu du tableau de bord ClipScale">
-        <div className="cs2-frame-bar"><i /><i /><i /><span>Tableau de bord</span></div>
-        <div className="cs2-frame-content">
-          <aside><Logo /><b>Vue d’ensemble</b><span>Missions</span><span>Clips</span><span>Équipe</span></aside>
-          <div className="cs2-frame-main">
-            <div className="cs2-frame-title"><div><small>MARDI 18 AOÛT</small><h2>Bonjour, Aron</h2></div><button>+ Nouvelle mission</button></div>
-            <div className="cs2-mini-stats"><div><small>CLIPS À VALIDER</small><strong>7</strong></div><div><small>EN PRODUCTION</small><strong>18</strong></div><div><small>À PUBLIER</small><strong>4</strong></div></div>
-            <div className="cs2-mini-panel"><b>Priorités du jour</b><span><i className="violet" /> Valider 7 clips pour Nova Studio <em>Aujourd’hui</em></span><span><i className="blue" /> Brief à compléter pour Maison Lune <em>20 min</em></span></div>
+        <div className="cs3-hero-visual" aria-label="Aperçu animé de ClipScale">
+          <div className="cs3-visual-glow" />
+          <div className="cs3-float-card cs3-float-score"><small>SCORE VIRAL</small><strong>87<span>/100</span></strong><i><b /></i><em>Fort potentiel ↗</em></div>
+          <div className="cs3-float-card cs3-float-publish"><span>✓</span><div><strong>Publication prête</strong><small>4 réseaux sélectionnés</small></div></div>
+          <div className="cs3-phone">
+            <div className="cs3-phone-top"><i /><span>APERÇU DU CLIP</span><b>•••</b></div>
+            <div className="cs3-video-art"><div className="cs3-video-grid" /><span className="cs3-play">▶</span><div className="cs3-caption"><small>LE DÉCLIC QUI</small><strong>CHANGE TOUT.</strong></div><em>00:24</em></div>
+            <div className="cs3-phone-bottom"><span><b>9:16</b><small>Format</small></span><span><b>24 s</b><small>Durée</small></span><span><b>1080p</b><small>Qualité</small></span></div>
           </div>
+          <div className="cs3-network-stack">{socialPlatforms.slice(0, 5).map((item, index) => <span key={item.id} className={`cs2-social-icon ${item.tone}`} style={{ "--stack": index } as CSSProperties}>{item.short}</span>)}</div>
         </div>
       </section>
 
-      <section className="cs2-section" id="workflow">
-        <div className="cs2-section-heading"><span>UN FLUX CLAIR</span><h2>Du brief à la publication,<br />sans perdre le fil.</h2><p>Chaque personne sait quoi faire, quand le faire et où retrouver l’information.</p></div>
-        <div className="cs2-steps">
-          <article><b>01</b><h3>Créez la mission</h3><p>Ajoutez le client, le contenu source, le nombre de clips et l’échéance.</p></article>
-          <article><b>02</b><h3>Produisez ensemble</h3><p>Assignez les clippeurs et centralisez versions, retours et validations.</p></article>
-          <article><b>03</b><h3>Livrez avec confiance</h3><p>Suivez l’avancement et partagez un état clair avec votre client.</p></article>
+      <section className="cs3-marquee" aria-label="Réseaux compatibles"><div>{[...socialPlatforms, ...socialPlatforms].map((item, index) => <span key={`${item.id}-${index}`}><i className={`cs2-social-icon ${item.tone}`}>{item.short}</i>{item.name}<b>✦</b></span>)}</div></section>
+
+      <section className="cs3-value" id="product">
+        <div className="cs3-section-tag">LE CHAOS S’ARRÊTE ICI</div>
+        <div className="cs3-value-head"><h2>Votre agence avance.<br />Vos outils doivent suivre.</h2><p>Fini les fichiers perdus, les validations dans les messages et les publications faites une par une. ClipScale transforme votre chaîne de production en système clair et scalable.</p></div>
+        <div className="cs3-value-grid"><article><strong>01</strong><span>Une source de vérité</span><p>Missions, clips, retours et statuts réunis au même endroit.</p></article><article><strong>02</strong><span>Des décisions plus rapides</span><p>Un score lisible et des améliorations concrètes avant de publier.</p></article><article><strong>03</strong><span>Une diffusion sans répétition</span><p>Une vidéo, une légende, tous les réseaux que vous choisissez.</p></article></div>
+      </section>
+
+      <section className="cs3-spotlight" id="features">
+        <div className="cs3-spotlight-copy"><div className="cs3-section-tag">LE PRODUIT EN ACTION</div><h2>Trois super-pouvoirs.<br /><em>Un seul écran.</em></h2><p>Chaque étape est pensée pour supprimer une friction précise de votre agence.</p><div className="cs3-tabs" role="tablist">{(["analyse", "publication", "pilotage"] as const).map((tab, index) => <button key={tab} role="tab" aria-selected={spotlight === tab} className={spotlight === tab ? "active" : ""} onClick={() => setSpotlight(tab)}><b>0{index + 1}</b><span>{tab === "analyse" ? "Analyse virale" : tab === "publication" ? "Publication multicanale" : "Pilotage d’agence"}</span></button>)}</div></div>
+        <div className="cs3-feature-screen">
+          {spotlight === "analyse" && <div className="cs3-screen-inner cs3-analysis-demo"><header><span>✦ ANALYSE AUTOMATIQUE</span><b>Diagnostic terminé</b></header><div className="cs3-demo-score"><div><strong>87</strong><small>/100</small></div><span><b>Fort potentiel</b><p>Le format et la durée favorisent la rétention.</p></span></div>{[["Accroche",92],["Durée",88],["Format",96],["Qualité",82]].map(([label, score]) => <div className="cs3-demo-factor" key={label}><span>{label}</span><i><b style={{ width: `${score}%` }} /></i><strong>{score}%</strong></div>)}<aside><b>↗ Priorité n°1</b><p>Affichez votre accroche dès la première image.</p></aside></div>}
+          {spotlight === "publication" && <div className="cs3-screen-inner cs3-publish-demo"><header><span>↑ PUBLICATION MULTICANALE</span><b>4 destinations</b></header><div className="cs3-upload-demo"><span>▶</span><div><b>clip-final-v3.mp4</b><small>9:16 · 24 secondes · Prêt</small></div><em>✓</em></div><h3>Choisissez vos réseaux</h3><div className="cs3-demo-networks">{socialPlatforms.slice(0, 8).map((item, index) => <span key={item.id} className={index < 4 ? "active" : ""}><i className={`cs2-social-icon ${item.tone}`}>{item.short}</i><b>{item.name}</b><em>{index < 4 ? "✓" : "+"}</em></span>)}</div><button>Préparer 4 publications →</button></div>}
+          {spotlight === "pilotage" && <div className="cs3-screen-inner cs3-pilot-demo"><header><span>⌂ VUE D’ENSEMBLE</span><b>En direct</b></header><div className="cs3-demo-kpis"><span><small>À VALIDER</small><strong>7</strong><em>clips</em></span><span><small>EN PRODUCTION</small><strong>18</strong><em>clips</em></span><span><small>À PUBLIER</small><strong>4</strong><em>clips</em></span></div><h3>Priorités du jour</h3>{["Valider 7 clips pour Nova Studio","Compléter le brief Maison Lune","Programmer 4 publications"].map((item, index) => <div className="cs3-demo-task" key={item}><i>{index + 1}</i><span><b>{item}</b><small>{index === 0 ? "Urgent · aujourd’hui" : index === 1 ? "Brief incomplet" : "Instagram · TikTok · YouTube · Facebook"}</small></span><em>→</em></div>)}</div>}
         </div>
       </section>
 
-      <section className="cs2-section cs2-audiences" id="audiences">
-        <div className="cs2-section-heading"><span>UN OUTIL, DEUX EXPÉRIENCES</span><h2>Chacun voit l’essentiel.</h2></div>
-        <div className="cs2-audience-grid">
-          <article><span className="cs2-card-icon">A</span><small>POUR LES AGENCES</small><h3>Une vue nette sur toute la production.</h3><ul><li>Priorités et retards visibles</li><li>Charge de l’équipe centralisée</li><li>Validations client suivies</li></ul></article>
-          <article><span className="cs2-card-icon alt">C</span><small>POUR LES CLIPPEURS</small><h3>Un espace de travail sans distraction.</h3><ul><li>Briefs complets au même endroit</li><li>Retours rattachés à la bonne version</li><li>Échéances faciles à suivre</li></ul></article>
-        </div>
-      </section>
+      <section className="cs3-workflow" id="workflow"><div className="cs3-section-tag">SIMPLE PAR CONCEPTION</div><h2>De la vidéo brute à la diffusion.<br /><em>Sans changer d’outil.</em></h2><div className="cs3-flow-line"><i /></div><div className="cs3-flow-grid"><article><span>01</span><b>Centralisez</b><p>Créez la mission, assignez l’équipe et rassemblez les versions.</p></article><article><span>02</span><b>Optimisez</b><p>Analysez la vidéo et appliquez les recommandations prioritaires.</p></article><article><span>03</span><b>Validez</b><p>Gardez les retours client rattachés à la bonne version.</p></article><article><span>04</span><b>Diffusez</b><p>Sélectionnez vos réseaux et préparez toutes les publications.</p></article></div></section>
 
-      <section className="cs2-beta" id="beta">
-        <div><span>BÊTA PRIVÉE</span><h2>Voyez ClipScale en action.</h2><p>Explorez un espace de démonstration avec des données fictives et testez le parcours complet.</p></div>
-        <button className="cs2-button cs2-button-light" onClick={launch}>Ouvrir la démo <span>→</span></button>
-      </section>
-      <footer><Logo /><p>Le cockpit simple des agences de clipping.</p><span>© 2026 ClipScale · Version bêta</span></footer>
+      <section className="cs3-bento"><article className="cs3-bento-large"><span>POUR LES AGENCES</span><h2>Plus de capacité.<br />Moins de coordination.</h2><p>Votre équipe voit ses priorités. Vos clients voient l’avancement. Vous gardez la maîtrise.</p><div><b><strong>1</strong><small>cockpit</small></b><b><strong>10</strong><small>réseaux</small></b><b><strong>0</strong><small>tableur</small></b></div></article><article className="cs3-bento-dark"><span>VIRALITÉ</span><div className="cs3-mini-ring">87</div><h3>Comprenez avant de publier.</h3><p>Accroche, format, durée et qualité expliqués clairement.</p></article><article className="cs3-bento-purple"><span>DIFFUSION</span><div className="cs3-bento-icons">{socialPlatforms.slice(0, 4).map((item) => <i className={`cs2-social-icon ${item.tone}`} key={item.id}>{item.short}</i>)}</div><h3>Publiez sans vous répéter.</h3><p>Une préparation unique pour tous vos canaux.</p></article></section>
+
+      <section className="cs3-final"><div className="cs3-final-orb" /><span>PRÊT À PASSER À L’ÉCHELLE ?</span><h2>Votre prochaine vidéo mérite<br /><em>mieux qu’un tableur.</em></h2><p>Entrez dans ClipScale et testez le parcours complet avec des données de démonstration.</p><button className="cs3-primary" onClick={launch}>Lancer la démo interactive <b>→</b></button><small>Aucun paiement · Accès immédiat · Données fictives</small></section>
+      <footer className="cs3-footer"><Logo /><p>Le cockpit de croissance des agences de clipping.</p><div><a href="/mentions-legales">Mentions légales</a><a href="/confidentialite">Confidentialité</a><span>© 2026 ClipScale</span></div></footer>
     </main>
   );
 }
