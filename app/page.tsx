@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ChangeEvent, type CSSProperties } from "react";
+import { useMemo, useState, type ChangeEvent, type CSSProperties, type KeyboardEvent } from "react";
 import "./clipscale-v2.css";
 
 type View = "overview" | "missions" | "clips" | "virality" | "publish" | "team" | "settings";
@@ -51,26 +51,37 @@ function Logo() {
 
 function Landing({ launch }: { launch: () => void }) {
   const [spotlight, setSpotlight] = useState<"analyse" | "publication" | "pilotage">("analyse");
+  const spotlightTabs = ["analyse", "publication", "pilotage"] as const;
+  const navigateSpotlight = (event: KeyboardEvent<HTMLButtonElement>, current: typeof spotlightTabs[number]) => {
+    const currentIndex = spotlightTabs.indexOf(current);
+    const nextIndex = event.key === "ArrowRight" ? (currentIndex + 1) % spotlightTabs.length : event.key === "ArrowLeft" ? (currentIndex - 1 + spotlightTabs.length) % spotlightTabs.length : event.key === "Home" ? 0 : event.key === "End" ? spotlightTabs.length - 1 : -1;
+    if (nextIndex < 0) return;
+    event.preventDefault();
+    const next = spotlightTabs[nextIndex];
+    setSpotlight(next);
+    window.requestAnimationFrame(() => document.getElementById(`tab-${next}`)?.focus());
+  };
   return (
     <main className="cs3-landing">
+      <a className="cs3-skip-link" href="#main-content">Aller au contenu principal</a>
       <div className="cs3-noise" aria-hidden="true" />
       <header className="cs3-header">
         <a href="#top" aria-label="Accueil ClipScale"><Logo /></a>
         <nav aria-label="Navigation principale"><a href="#product">Produit</a><a href="#workflow">Fonctionnement</a><a href="#features">Fonctionnalités</a></nav>
-        <button className="cs3-nav-cta" onClick={launch}>Essayer la démo <span>↗</span></button>
+        <button type="button" className="cs3-nav-cta" onClick={launch}>Voir la démo <span aria-hidden="true">↗</span></button>
       </header>
 
-      <section className="cs3-hero" id="top">
+      <section className="cs3-hero" id="main-content">
         <div className="cs3-orb cs3-orb-one" aria-hidden="true" /><div className="cs3-orb cs3-orb-two" aria-hidden="true" />
         <div className="cs3-hero-copy">
-          <div className="cs3-kicker"><span><i /> NOUVEAU</span> Analyse virale & publication multicanale <b>→</b></div>
+          <div className="cs3-kicker"><span><i /> NOUVEAU</span> Analyse virale et publication multicanale <b aria-hidden="true">→</b></div>
           <h1>Une vidéo.<br /><em>Partout.</em> Plus vite.</h1>
-          <p>ClipScale réunit votre production, estime le potentiel viral de vos clips et prépare leur diffusion sur tous vos réseaux depuis un seul cockpit.</p>
-          <div className="cs3-actions"><button className="cs3-primary" onClick={launch}>Explorer ClipScale <span>→</span></button><a href="#product">Voir comment ça marche <i>↓</i></a></div>
-          <div className="cs3-reassurance"><span>✓ Démo immédiate</span><span>✓ Sans carte bancaire</span><span>✓ Conçu pour les agences</span></div>
+          <p>Centralisez la production, améliorez le potentiel de chaque clip et préparez sa diffusion sur plusieurs réseaux depuis un seul espace.</p>
+          <div className="cs3-actions"><button type="button" className="cs3-primary" onClick={launch}>Tester la démo interactive <span aria-hidden="true">→</span></button><a href="#product">Découvrir le produit <i aria-hidden="true">↓</i></a></div>
+          <div className="cs3-reassurance"><span>✓ Accès immédiat</span><span>✓ Aucune carte bancaire</span><span>✓ Données de démonstration</span></div>
         </div>
 
-        <div className="cs3-hero-visual" aria-label="Aperçu animé de ClipScale">
+        <div className="cs3-hero-visual" role="img" aria-label="Aperçu animé d’un clip analysé avec un score viral de 87 sur 100 et quatre réseaux sélectionnés">
           <div className="cs3-visual-glow" />
           <div className="cs3-float-card cs3-float-score"><small>SCORE VIRAL</small><strong>87<span>/100</span></strong><i><b /></i><em>Fort potentiel ↗</em></div>
           <div className="cs3-float-card cs3-float-publish"><span>✓</span><div><strong>Publication prête</strong><small>4 réseaux sélectionnés</small></div></div>
@@ -83,7 +94,7 @@ function Landing({ launch }: { launch: () => void }) {
         </div>
       </section>
 
-      <section className="cs3-marquee" aria-label="Réseaux compatibles"><div>{[...socialPlatforms, ...socialPlatforms].map((item, index) => <span key={`${item.id}-${index}`}><i className={`cs2-social-icon ${item.tone}`}>{item.short}</i>{item.name}<b>✦</b></span>)}</div></section>
+      <section className="cs3-marquee" aria-label="Réseaux proposés dans le parcours de publication"><p className="cs3-sr-only">Instagram, TikTok, YouTube, Facebook, LinkedIn, Threads, Pinterest, Snapchat, Telegram et Bluesky.</p><div aria-hidden="true">{[...socialPlatforms, ...socialPlatforms].map((item, index) => <span key={`${item.id}-${index}`}><i className={`cs2-social-icon ${item.tone}`}>{item.short}</i>{item.name}<b>✦</b></span>)}</div></section>
 
       <section className="cs3-value" id="product">
         <div className="cs3-section-tag">LE CHAOS S’ARRÊTE ICI</div>
@@ -92,11 +103,11 @@ function Landing({ launch }: { launch: () => void }) {
       </section>
 
       <section className="cs3-spotlight" id="features">
-        <div className="cs3-spotlight-copy"><div className="cs3-section-tag">LE PRODUIT EN ACTION</div><h2>Trois super-pouvoirs.<br /><em>Un seul écran.</em></h2><p>Chaque étape est pensée pour supprimer une friction précise de votre agence.</p><div className="cs3-tabs" role="tablist">{(["analyse", "publication", "pilotage"] as const).map((tab, index) => <button key={tab} role="tab" aria-selected={spotlight === tab} className={spotlight === tab ? "active" : ""} onClick={() => setSpotlight(tab)}><b>0{index + 1}</b><span>{tab === "analyse" ? "Analyse virale" : tab === "publication" ? "Publication multicanale" : "Pilotage d’agence"}</span></button>)}</div></div>
-        <div className="cs3-feature-screen">
-          {spotlight === "analyse" && <div className="cs3-screen-inner cs3-analysis-demo"><header><span>✦ ANALYSE AUTOMATIQUE</span><b>Diagnostic terminé</b></header><div className="cs3-demo-score"><div><strong>87</strong><small>/100</small></div><span><b>Fort potentiel</b><p>Le format et la durée favorisent la rétention.</p></span></div>{[["Accroche",92],["Durée",88],["Format",96],["Qualité",82]].map(([label, score]) => <div className="cs3-demo-factor" key={label}><span>{label}</span><i><b style={{ width: `${score}%` }} /></i><strong>{score}%</strong></div>)}<aside><b>↗ Priorité n°1</b><p>Affichez votre accroche dès la première image.</p></aside></div>}
-          {spotlight === "publication" && <div className="cs3-screen-inner cs3-publish-demo"><header><span>↑ PUBLICATION MULTICANALE</span><b>4 destinations</b></header><div className="cs3-upload-demo"><span>▶</span><div><b>clip-final-v3.mp4</b><small>9:16 · 24 secondes · Prêt</small></div><em>✓</em></div><h3>Choisissez vos réseaux</h3><div className="cs3-demo-networks">{socialPlatforms.slice(0, 8).map((item, index) => <span key={item.id} className={index < 4 ? "active" : ""}><i className={`cs2-social-icon ${item.tone}`}>{item.short}</i><b>{item.name}</b><em>{index < 4 ? "✓" : "+"}</em></span>)}</div><button>Préparer 4 publications →</button></div>}
-          {spotlight === "pilotage" && <div className="cs3-screen-inner cs3-pilot-demo"><header><span>⌂ VUE D’ENSEMBLE</span><b>En direct</b></header><div className="cs3-demo-kpis"><span><small>À VALIDER</small><strong>7</strong><em>clips</em></span><span><small>EN PRODUCTION</small><strong>18</strong><em>clips</em></span><span><small>À PUBLIER</small><strong>4</strong><em>clips</em></span></div><h3>Priorités du jour</h3>{["Valider 7 clips pour Nova Studio","Compléter le brief Maison Lune","Programmer 4 publications"].map((item, index) => <div className="cs3-demo-task" key={item}><i>{index + 1}</i><span><b>{item}</b><small>{index === 0 ? "Urgent · aujourd’hui" : index === 1 ? "Brief incomplet" : "Instagram · TikTok · YouTube · Facebook"}</small></span><em>→</em></div>)}</div>}
+        <div className="cs3-spotlight-copy"><div className="cs3-section-tag">LE PRODUIT EN ACTION</div><h2>Trois fonctions clés.<br /><em>Un seul espace.</em></h2><p>Chaque vue répond à une tâche précise : améliorer, diffuser ou piloter.</p><div className="cs3-tabs" role="tablist" aria-label="Démonstrations du produit">{spotlightTabs.map((tab, index) => <button type="button" id={`tab-${tab}`} key={tab} role="tab" aria-controls={`panel-${tab}`} aria-selected={spotlight === tab} tabIndex={spotlight === tab ? 0 : -1} className={spotlight === tab ? "active" : ""} onClick={() => setSpotlight(tab)} onKeyDown={(event) => navigateSpotlight(event, tab)}><b>0{index + 1}</b><span>{tab === "analyse" ? "Analyse virale" : tab === "publication" ? "Publication multicanale" : "Pilotage d’agence"}</span></button>)}</div></div>
+        <div className="cs3-feature-screen" aria-live="polite">
+          {spotlight === "analyse" && <div id="panel-analyse" role="tabpanel" aria-labelledby="tab-analyse" className="cs3-screen-inner cs3-analysis-demo"><header><span>✦ ANALYSE AUTOMATIQUE</span><b>Diagnostic terminé</b></header><div className="cs3-demo-score"><div><strong>87</strong><small>/100</small></div><span><b>Fort potentiel</b><p>Le format et la durée favorisent la rétention.</p></span></div>{[["Accroche",92],["Durée",88],["Format",96],["Qualité",82]].map(([label, score]) => <div className="cs3-demo-factor" key={label}><span>{label}</span><i><b style={{ width: `${score}%` }} /></i><strong>{score}%</strong></div>)}<aside><b>↗ Priorité n°1</b><p>Affichez votre accroche dès la première image.</p></aside></div>}
+          {spotlight === "publication" && <div id="panel-publication" role="tabpanel" aria-labelledby="tab-publication" className="cs3-screen-inner cs3-publish-demo"><header><span>↑ PUBLICATION MULTICANALE</span><b>4 destinations</b></header><div className="cs3-upload-demo"><span>▶</span><div><b>clip-final-v3.mp4</b><small>9:16 · 24 secondes · Prêt</small></div><em>✓</em></div><h3>Choisissez vos réseaux</h3><div className="cs3-demo-networks">{socialPlatforms.slice(0, 8).map((item, index) => <span key={item.id} className={index < 4 ? "active" : ""}><i className={`cs2-social-icon ${item.tone}`}>{item.short}</i><b>{item.name}</b><em>{index < 4 ? "✓" : "+"}</em></span>)}</div><div className="cs3-demo-cta">Préparer 4 publications →</div></div>}
+          {spotlight === "pilotage" && <div id="panel-pilotage" role="tabpanel" aria-labelledby="tab-pilotage" className="cs3-screen-inner cs3-pilot-demo"><header><span>⌂ VUE D’ENSEMBLE</span><b>En direct</b></header><div className="cs3-demo-kpis"><span><small>À VALIDER</small><strong>7</strong><em>clips</em></span><span><small>EN PRODUCTION</small><strong>18</strong><em>clips</em></span><span><small>À PUBLIER</small><strong>4</strong><em>clips</em></span></div><h3>Priorités du jour</h3>{["Valider 7 clips pour Nova Studio","Compléter le brief Maison Lune","Programmer 4 publications"].map((item, index) => <div className="cs3-demo-task" key={item}><i>{index + 1}</i><span><b>{item}</b><small>{index === 0 ? "Urgent · aujourd’hui" : index === 1 ? "Brief incomplet" : "Instagram · TikTok · YouTube · Facebook"}</small></span><em>→</em></div>)}</div>}
         </div>
       </section>
 
@@ -104,7 +115,7 @@ function Landing({ launch }: { launch: () => void }) {
 
       <section className="cs3-bento"><article className="cs3-bento-large"><span>POUR LES AGENCES</span><h2>Plus de capacité.<br />Moins de coordination.</h2><p>Votre équipe voit ses priorités. Vos clients voient l’avancement. Vous gardez la maîtrise.</p><div><b><strong>1</strong><small>cockpit</small></b><b><strong>10</strong><small>réseaux</small></b><b><strong>0</strong><small>tableur</small></b></div></article><article className="cs3-bento-dark"><span>VIRALITÉ</span><div className="cs3-mini-ring">87</div><h3>Comprenez avant de publier.</h3><p>Accroche, format, durée et qualité expliqués clairement.</p></article><article className="cs3-bento-purple"><span>DIFFUSION</span><div className="cs3-bento-icons">{socialPlatforms.slice(0, 4).map((item) => <i className={`cs2-social-icon ${item.tone}`} key={item.id}>{item.short}</i>)}</div><h3>Publiez sans vous répéter.</h3><p>Une préparation unique pour tous vos canaux.</p></article></section>
 
-      <section className="cs3-final"><div className="cs3-final-orb" /><span>PRÊT À PASSER À L’ÉCHELLE ?</span><h2>Votre prochaine vidéo mérite<br /><em>mieux qu’un tableur.</em></h2><p>Entrez dans ClipScale et testez le parcours complet avec des données de démonstration.</p><button className="cs3-primary" onClick={launch}>Lancer la démo interactive <b>→</b></button><small>Aucun paiement · Accès immédiat · Données fictives</small></section>
+      <section className="cs3-final"><div className="cs3-final-orb" /><span>PRÊT À SIMPLIFIER VOTRE PRODUCTION ?</span><h2>Votre prochaine vidéo mérite<br /><em>mieux qu’un tableur.</em></h2><p>Testez le parcours complet : pilotage, analyse virale et préparation multicanale.</p><button type="button" className="cs3-primary" onClick={launch}>Tester ClipScale maintenant <b aria-hidden="true">→</b></button><small>Accès immédiat · Aucun paiement · Données fictives</small></section>
       <footer className="cs3-footer"><Logo /><p>Le cockpit de croissance des agences de clipping.</p><div><a href="/mentions-legales">Mentions légales</a><a href="/confidentialite">Confidentialité</a><span>© 2026 ClipScale</span></div></footer>
     </main>
   );
