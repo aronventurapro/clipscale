@@ -109,10 +109,16 @@ const motionSteps = [
 ];
 
 const creatorResults = [
-  { name: "Yomi Denzel", initials: "YD", views: 4_500_000, compactValue: 4.5, compactSuffix: " M", share: 100, accent: "#a991ff" },
-  { name: "Maouno", initials: "MA", views: 2_500_000, compactValue: 2.5, compactSuffix: " M", share: 56, accent: "#7d9cff" },
-  { name: "Keo", initials: "KE", views: 1_200_000, compactValue: 1.2, compactSuffix: " M", share: 27, accent: "#64d7b2" },
-  { name: "Blyaat", initials: "BL", views: 79_000, compactValue: 79, compactSuffix: " k", share: 8, accent: "#f0a66a" },
+  { name: "Yomi Denzel", image: "/creator-results/yomi-denzel.webp", position: "center 36%", views: 4_500_000, compactValue: 4.5, compactSuffix: " M", share: 100, accent: "#a991ff" },
+  { name: "Maouno", image: "/creator-results/maouno.webp", position: "center 59%", views: 2_500_000, compactValue: 2.5, compactSuffix: " M", share: 56, accent: "#7d9cff" },
+  { name: "Keo", image: "/creator-results/keo.webp", position: "center 28%", views: 1_200_000, compactValue: 1.2, compactSuffix: " M", share: 27, accent: "#64d7b2" },
+  { name: "Blyaat", image: "/creator-results/blyaat.webp", position: "center 31%", views: 79_000, compactValue: 79, compactSuffix: " k", share: 8, accent: "#f0a66a" },
+];
+
+const additionalCreators = [
+  { image: "/creator-results/collaboration-1.webp", position: "center 28%" },
+  { image: "/creator-results/collaboration-2.webp", position: "center 22%" },
+  { image: "/creator-results/collaboration-3.webp", position: "center 35%" },
 ];
 
 function Landing({ launch }: { launch: (plan?: string, requireAccount?: boolean) => void }) {
@@ -195,10 +201,11 @@ function Landing({ launch }: { launch: (plan?: string, requireAccount?: boolean)
         <header className="cs6-proof-head"><div><div className="cs3-section-tag">DES RÉSULTATS QUI SE MESURENT</div><h2 id="creator-results-title">Des créateurs ambitieux.<br /><em>Des millions de vues.</em></h2><p>Découvrez les performances générées au fil de mes collaborations avec des créateurs reconnus.</p></div><div className="cs6-proof-total"><span>VUES GÉNÉRÉES AU TOTAL</span><strong><AnimatedNumber value={8_279_000} suffix="+" duration={1900} /></strong><small>sur ces quatre collaborations</small><i><b /></i></div></header>
         <div className="cs6-proof-shell">
           <div className="cs6-proof-focus" key={creatorResults[activeCreator].name} style={{ "--creator-accent": creatorResults[activeCreator].accent } as CSSProperties}>
-            <span className="cs6-proof-rank">0{activeCreator + 1} · COLLABORATION</span><div className="cs6-proof-avatar">{creatorResults[activeCreator].initials}<i /></div><div className="cs6-proof-focus-copy"><small>CRÉATEUR ACCOMPAGNÉ</small><h3>{creatorResults[activeCreator].name}</h3><p>Une stratégie de contenu pensée pour maximiser l’accroche, la rétention et la distribution multicanale.</p></div><div className="cs6-proof-number"><span>VUES GÉNÉRÉES</span><strong><AnimatedNumber value={creatorResults[activeCreator].views} duration={1700} /></strong><small>grâce à la collaboration</small></div><div className="cs6-proof-signal" aria-hidden="true">{[28,46,39,64,52,82,68,96,78,100].map((height,index) => <i key={index} style={{ height: `${height}%`, animationDelay: `${index * 70}ms` }} />)}</div>
+            <span className="cs6-proof-rank">0{activeCreator + 1} · COLLABORATION</span><div className="cs6-proof-avatar"><img src={creatorResults[activeCreator].image} alt={`Portrait de ${creatorResults[activeCreator].name}`} style={{ objectPosition: creatorResults[activeCreator].position }} /><i /></div><div className="cs6-proof-focus-copy"><small>CRÉATEUR ACCOMPAGNÉ</small><h3>{creatorResults[activeCreator].name}</h3><p>Une stratégie de contenu pensée pour maximiser l’accroche, la rétention et la distribution multicanale.</p></div><div className="cs6-proof-number"><span>VUES GÉNÉRÉES</span><strong><AnimatedNumber value={creatorResults[activeCreator].views} duration={1700} /></strong><small>grâce à la collaboration</small></div><div className="cs6-proof-signal" aria-hidden="true">{[28,46,39,64,52,82,68,96,78,100].map((height,index) => <i key={index} style={{ height: `${height}%`, animationDelay: `${index * 70}ms` }} />)}</div>
           </div>
-          <div className="cs6-proof-list" aria-label="Choisir un résultat créateur">{creatorResults.map((creator,index) => <button type="button" aria-pressed={activeCreator === index} className={activeCreator === index ? "active" : ""} onClick={() => setActiveCreator(index)} key={creator.name} style={{ "--creator-accent": creator.accent } as CSSProperties}><span className="cs6-proof-mini-avatar">{creator.initials}</span><span className="cs6-proof-name"><b>{creator.name}</b><small>Collaboration créateur</small></span><strong><AnimatedNumber value={creator.compactValue} decimals={creator.compactValue % 1 ? 1 : 0} suffix={creator.compactSuffix} /></strong><i><b style={{ width: `${creator.share}%` }} /></i><em>→</em></button>)}</div>
+          <div className="cs6-proof-list" aria-label="Choisir un résultat créateur">{creatorResults.map((creator,index) => <button type="button" aria-pressed={activeCreator === index} className={activeCreator === index ? "active" : ""} onClick={() => setActiveCreator(index)} key={creator.name} style={{ "--creator-accent": creator.accent } as CSSProperties}><span className="cs6-proof-mini-avatar"><img src={creator.image} alt="" style={{ objectPosition: creator.position }} /></span><span className="cs6-proof-name"><b>{creator.name}</b><small>Collaboration créateur</small></span><strong><AnimatedNumber value={creator.compactValue} decimals={creator.compactValue % 1 ? 1 : 0} suffix={creator.compactSuffix} /></strong><i><b style={{ width: `${creator.share}%` }} /></i><em>→</em></button>)}</div>
         </div>
+        <div className="cs6-proof-more"><div><span>ET BIEN D’AUTRES</span><strong>Une expérience construite aux côtés de créateurs aux univers très différents.</strong><small>D’autres collaborations et résultats seront ajoutés prochainement.</small></div><div className="cs6-proof-more-stack" aria-label="Autres créateurs accompagnés">{additionalCreators.map((creator,index) => <figure key={creator.image} style={{ "--portrait-index": index } as CSSProperties}><img src={creator.image} alt={`Autre créateur accompagné ${index + 1}`} style={{ objectPosition: creator.position }} /></figure>)}</div></div>
         <p className="cs6-proof-note">Résultats communiqués par Aron Ventura · Les performances varient selon le contenu, l’audience et les plateformes.</p>
       </section>
 
