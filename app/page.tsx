@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ChangeEvent, type CSSProperties, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties, type KeyboardEvent } from "react";
 import { SiBluesky, SiFacebook, SiInstagram, SiLinkedin, SiPinterest, SiSnapchat, SiTelegram, SiThreads, SiTiktok, SiYoutube } from "react-icons/si";
 import { supabase } from "../lib/supabase";
 import "./clipscale-v2.css";
@@ -58,20 +58,38 @@ function Logo() {
   return <span className="cs2-logo"><span className="cs2-logo-mark">C</span>ClipScale</span>;
 }
 
-function AnimatedNumber({ value, suffix = "" }: { value: number; suffix?: string }) {
+function AnimatedNumber({ value, prefix = "", suffix = "", decimals = 0, duration = 1200 }: { value: number; prefix?: string; suffix?: string; decimals?: number; duration?: number }) {
+  const ref = useRef<HTMLSpanElement>(null);
   const [display, setDisplay] = useState(0);
+  const [visible, setVisible] = useState(false);
   useEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) setDisplay(value);
+        else setVisible(true);
+        observer.disconnect();
+      }
+    }, { threshold: 0.35 });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [value]);
+  useEffect(() => {
+    if (!visible) return;
     let frame = 0;
     const started = performance.now();
+    const completion = window.setTimeout(() => setDisplay(value), duration + 120);
     const tick = (now: number) => {
-      const progress = Math.min(1, (now - started) / 900);
-      setDisplay(Math.round(value * (1 - Math.pow(1 - progress, 3))));
+      const progress = Math.min(1, (now - started) / duration);
+      const next = value * (1 - Math.pow(1 - progress, 4));
+      setDisplay(decimals ? Number(next.toFixed(decimals)) : Math.round(next));
       if (progress < 1) frame = requestAnimationFrame(tick);
     };
     frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
-  }, [value]);
-  return <>{display.toLocaleString("fr-FR")}{suffix}</>;
+    return () => { cancelAnimationFrame(frame); window.clearTimeout(completion); };
+  }, [decimals, duration, value, visible]);
+  return <span ref={ref} className="cs5-count" aria-label={`${prefix}${value.toLocaleString("fr-FR", { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}${suffix}`}>{prefix}{display.toLocaleString("fr-FR", { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}{suffix}</span>;
 }
 
 function PerformanceChart() {
@@ -82,6 +100,13 @@ const plans = [
   { name: "Starter", price: 29, description: "Pour publier régulièrement sans perdre de temps.", features: ["1 espace de travail", "30 clips par mois", "4 réseaux connectés", "Analyse de viralité"], cta: "Commencer avec Starter" },
   { name: "Scale", price: 79, description: "Pour les créateurs et petites équipes qui accélèrent.", features: ["3 membres inclus", "150 clips par mois", "10 réseaux connectés", "Variantes IA par plateforme", "Statistiques avancées"], cta: "Choisir Scale", popular: true },
   { name: "Agency", price: 149, description: "Pour piloter plusieurs clients depuis un seul cockpit.", features: ["10 membres inclus", "Clips illimités", "Espaces clients", "Publication prioritaire", "Support dédié"], cta: "Passer à Agency" },
+];
+
+const motionSteps = [
+  { number: "01", label: "Importez", detail: "Votre clip arrive dans un espace unique." },
+  { number: "02", label: "Analysez", detail: "Le score viral révèle les priorités." },
+  { number: "03", label: "Adaptez", detail: "Chaque réseau reçoit sa bonne variante." },
+  { number: "04", label: "Publiez", detail: "Votre campagne part depuis un cockpit." },
 ];
 
 function Landing({ launch }: { launch: (plan?: string, requireAccount?: boolean) => void }) {
@@ -119,7 +144,7 @@ function Landing({ launch }: { launch: (plan?: string, requireAccount?: boolean)
 
         <div className="cs3-hero-visual" role="img" aria-label="Aperçu animé d’un clip analysé avec un score viral de 87 sur 100 et quatre réseaux sélectionnés">
           <div className="cs3-visual-glow" />
-          <div className="cs3-float-card cs3-float-score"><small>SCORE VIRAL</small><strong>87<span>/100</span></strong><i><b /></i><em>Fort potentiel ↗</em></div>
+          <div className="cs3-float-card cs3-float-score"><small>SCORE VIRAL</small><strong><AnimatedNumber value={87} duration={1450} /><span>/100</span></strong><i><b /></i><em>Fort potentiel ↗</em></div>
           <div className="cs3-float-card cs3-float-publish"><span>✓</span><div><strong>Publication prête</strong><small>4 réseaux sélectionnés</small></div></div>
           <div className="cs3-phone">
             <div className="cs3-phone-top"><i /><span>APERÇU DU CLIP</span><b>•••</b></div>
@@ -141,23 +166,26 @@ function Landing({ launch }: { launch: (plan?: string, requireAccount?: boolean)
       <section className="cs3-spotlight" id="features">
         <div className="cs3-spotlight-copy"><div className="cs3-section-tag">LE PRODUIT EN ACTION</div><h2>Trois fonctions clés.<br /><em>Un seul espace.</em></h2><p>Chaque vue répond à une tâche précise : améliorer, diffuser ou piloter.</p><div className="cs3-tabs" role="tablist" aria-label="Démonstrations du produit">{spotlightTabs.map((tab, index) => <button type="button" id={`tab-${tab}`} key={tab} role="tab" aria-controls={`panel-${tab}`} aria-selected={spotlight === tab} tabIndex={spotlight === tab ? 0 : -1} className={spotlight === tab ? "active" : ""} onClick={() => setSpotlight(tab)} onKeyDown={(event) => navigateSpotlight(event, tab)}><b>0{index + 1}</b><span>{tab === "analyse" ? "Analyse virale" : tab === "publication" ? "Publication multicanale" : "Pilotage d’agence"}</span></button>)}</div></div>
         <div className="cs3-feature-screen" aria-live="polite">
-          {spotlight === "analyse" && <div id="panel-analyse" role="tabpanel" aria-labelledby="tab-analyse" className="cs3-screen-inner cs3-analysis-demo"><header><span>✦ ANALYSE AUTOMATIQUE</span><b>Diagnostic terminé</b></header><div className="cs3-demo-score"><div><strong>87</strong><small>/100</small></div><span><b>Fort potentiel</b><p>Le format et la durée favorisent la rétention.</p></span></div>{[["Accroche",92],["Durée",88],["Format",96],["Qualité",82]].map(([label, score]) => <div className="cs3-demo-factor" key={label}><span>{label}</span><i><b style={{ width: `${score}%` }} /></i><strong>{score}%</strong></div>)}<aside><b>↗ Priorité n°1</b><p>Affichez votre accroche dès la première image.</p></aside></div>}
+          {spotlight === "analyse" && <div id="panel-analyse" role="tabpanel" aria-labelledby="tab-analyse" className="cs3-screen-inner cs3-analysis-demo"><header><span>✦ ANALYSE AUTOMATIQUE</span><b>Diagnostic terminé</b></header><div className="cs3-demo-score"><div><strong><AnimatedNumber value={87} duration={1100} /></strong><small>/100</small></div><span><b>Fort potentiel</b><p>Le format et la durée favorisent la rétention.</p></span></div>{[["Accroche",92],["Durée",88],["Format",96],["Qualité",82]].map(([label, score]) => <div className="cs3-demo-factor" key={label}><span>{label}</span><i><b style={{ width: `${score}%` }} /></i><strong><AnimatedNumber value={Number(score)} suffix="%" duration={900} /></strong></div>)}<aside><b>↗ Priorité n°1</b><p>Affichez votre accroche dès la première image.</p></aside></div>}
           {spotlight === "publication" && <div id="panel-publication" role="tabpanel" aria-labelledby="tab-publication" className="cs3-screen-inner cs3-publish-demo"><header><span>↑ PUBLICATION MULTICANALE</span><b>4 destinations</b></header><div className="cs3-upload-demo"><span>▶</span><div><b>clip-final-v3.mp4</b><small>9:16 · 24 secondes · Prêt</small></div><em>✓</em></div><h3>Choisissez vos réseaux</h3><div className="cs3-demo-networks">{socialPlatforms.slice(0, 8).map((item, index) => <span key={item.id} className={index < 4 ? "active" : ""}><SocialIcon platform={item} /><b>{item.name}</b><em>{index < 4 ? "✓" : "+"}</em></span>)}</div><div className="cs3-demo-cta">Préparer 4 publications →</div></div>}
-          {spotlight === "pilotage" && <div id="panel-pilotage" role="tabpanel" aria-labelledby="tab-pilotage" className="cs3-screen-inner cs3-pilot-demo"><header><span>⌂ VUE D’ENSEMBLE</span><b>En direct</b></header><div className="cs3-demo-kpis"><span><small>À VALIDER</small><strong>7</strong><em>clips</em></span><span><small>EN PRODUCTION</small><strong>18</strong><em>clips</em></span><span><small>À PUBLIER</small><strong>4</strong><em>clips</em></span></div><h3>Priorités du jour</h3>{["Valider 7 clips pour Nova Studio","Compléter le brief Maison Lune","Programmer 4 publications"].map((item, index) => <div className="cs3-demo-task" key={item}><i>{index + 1}</i><span><b>{item}</b><small>{index === 0 ? "Urgent · aujourd’hui" : index === 1 ? "Brief incomplet" : "Instagram · TikTok · YouTube · Facebook"}</small></span><em>→</em></div>)}</div>}
+          {spotlight === "pilotage" && <div id="panel-pilotage" role="tabpanel" aria-labelledby="tab-pilotage" className="cs3-screen-inner cs3-pilot-demo"><header><span>⌂ VUE D’ENSEMBLE</span><b>En direct</b></header><div className="cs3-demo-kpis"><span><small>À VALIDER</small><strong><AnimatedNumber value={7} /></strong><em>clips</em></span><span><small>EN PRODUCTION</small><strong><AnimatedNumber value={18} /></strong><em>clips</em></span><span><small>À PUBLIER</small><strong><AnimatedNumber value={4} /></strong><em>clips</em></span></div><h3>Priorités du jour</h3>{["Valider 7 clips pour Nova Studio","Compléter le brief Maison Lune","Programmer 4 publications"].map((item, index) => <div className="cs3-demo-task" key={item}><i>{index + 1}</i><span><b>{item}</b><small>{index === 0 ? "Urgent · aujourd’hui" : index === 1 ? "Brief incomplet" : "Instagram · TikTok · YouTube · Facebook"}</small></span><em>→</em></div>)}</div>}
         </div>
       </section>
 
       <section className="cs3-workflow" id="workflow"><div className="cs3-section-tag">SIMPLE PAR CONCEPTION</div><h2>De la vidéo brute à la diffusion.<br /><em>Sans changer d’outil.</em></h2><div className="cs3-flow-line"><i /></div><div className="cs3-flow-grid"><article><span>01</span><b>Centralisez</b><p>Créez la mission, assignez l’équipe et rassemblez les versions.</p></article><article><span>02</span><b>Optimisez</b><p>Analysez la vidéo et appliquez les recommandations prioritaires.</p></article><article><span>03</span><b>Validez</b><p>Gardez les retours client rattachés à la bonne version.</p></article><article><span>04</span><b>Diffusez</b><p>Sélectionnez vos réseaux et préparez toutes les publications.</p></article></div></section>
 
-      <section className="cs3-bento"><article className="cs3-bento-large"><span>POUR LES AGENCES</span><h2>Plus de capacité.<br />Moins de coordination.</h2><p>Votre équipe voit ses priorités. Vos clients voient l’avancement. Vous gardez la maîtrise.</p><div><b><strong>1</strong><small>cockpit</small></b><b><strong>10</strong><small>réseaux</small></b><b><strong>0</strong><small>tableur</small></b></div></article><article className="cs3-bento-dark"><span>VIRALITÉ</span><div className="cs3-mini-ring">87</div><h3>Comprenez avant de publier.</h3><p>Accroche, format, durée et qualité expliqués clairement.</p></article><article className="cs3-bento-purple"><span>DIFFUSION</span><div className="cs3-bento-icons">{socialPlatforms.slice(0, 4).map((item) => <SocialIcon platform={item} key={item.id} />)}</div><h3>Publiez sans vous répéter.</h3><p>Une préparation unique pour tous vos canaux.</p></article></section>
+      <section className="cs3-bento"><article className="cs3-bento-large"><span>POUR LES AGENCES</span><h2>Plus de capacité.<br />Moins de coordination.</h2><p>Votre équipe voit ses priorités. Vos clients voient l’avancement. Vous gardez la maîtrise.</p><div><b><strong><AnimatedNumber value={1} /></strong><small>cockpit</small></b><b><strong><AnimatedNumber value={10} /></strong><small>réseaux</small></b><b><strong><AnimatedNumber value={0} /></strong><small>tableur</small></b></div></article><article className="cs3-bento-dark"><span>VIRALITÉ</span><div className="cs3-mini-ring"><AnimatedNumber value={87} /></div><h3>Comprenez avant de publier.</h3><p>Accroche, format, durée et qualité expliqués clairement.</p></article><article className="cs3-bento-purple"><span>DIFFUSION</span><div className="cs3-bento-icons">{socialPlatforms.slice(0, 4).map((item) => <SocialIcon platform={item} key={item.id} />)}</div><h3>Publiez sans vous répéter.</h3><p>Une préparation unique pour tous vos canaux.</p></article></section>
 
-      <section className="cs3-video-demo"><div><div className="cs3-section-tag">30 SECONDES POUR TOUT COMPRENDRE</div><h2>Voyez le workflow<br /><em>avant de commencer.</em></h2><p>De l’import du clip à la préparation multicanale, cette démonstration présente le parcours complet de ClipScale.</p><button type="button" onClick={() => launch()}>Essayer le parcours vous-même →</button></div><div className="cs3-video-frame"><video controls muted playsInline preload="metadata"><source src="/clipscale-demo.mp4" type="video/mp4" /></video><span>00:30 · DÉMO PRODUIT</span></div></section>
+      <section className="cs3-video-demo" id="demo-video">
+        <div className="cs3-video-copy"><div className="cs3-section-tag">30 SECONDES POUR TOUT COMPRENDRE</div><h2>Voyez ClipScale<br /><em>prendre vie.</em></h2><p>Une démonstration motion design, de votre clip brut à une campagne prête pour chaque plateforme.</p><div className="cs5-motion-steps">{motionSteps.map((step) => <div key={step.number}><b>{step.number}</b><span><strong>{step.label}</strong><small>{step.detail}</small></span></div>)}</div><button type="button" onClick={() => launch()}>Essayer le cockpit interactif →</button></div>
+        <div className="cs3-video-stage"><div className="cs3-video-halo" aria-hidden="true"/><div className="cs3-video-frame"><video controls autoPlay muted loop playsInline preload="auto" aria-label="Démonstration animée de ClipScale en 30 secondes"><source src="/clipscale-demo.mp4" type="video/mp4" /></video><span><i/> MOTION DEMO · 00:30</span><div className="cs5-video-badge score"><small>SCORE VIRAL</small><b><AnimatedNumber value={87} /></b></div><div className="cs5-video-badge ready"><i>✓</i><span><b>10 variantes prêtes</b><small>Adaptées automatiquement</small></span></div></div></div>
+      </section>
 
-      <section className="cs3-results"><div className="cs3-section-tag">RÉSULTATS ATTENDUS</div><h2>Moins d’opérations.<br />Plus de contenu publié.</h2><div className="cs3-results-grid">{[["-68%","de temps consacré à la diffusion","Scénario agence · 5 clients"],["×3","plus de variantes publiées","Scénario créateur · 4 réseaux"],["+24%","de vues hebdomadaires","Projection issue du tableau de bord démo"]].map(([value,label,note]) => <article key={value}><strong>{value}</strong><p>{label}</p><small>{note}</small></article>)}</div><p className="cs3-results-disclaimer">Ces chiffres illustrent des scénarios de démonstration. Les résultats réels dépendent du contenu, de l’audience et des plateformes.</p></section>
+      <section className="cs3-results"><div className="cs3-section-tag">RÉSULTATS ATTENDUS</div><h2>Moins d’opérations.<br />Plus de contenu publié.</h2><div className="cs3-results-grid"><article><strong><AnimatedNumber value={68} prefix="−" suffix="%" duration={1600}/></strong><p>de temps consacré à la diffusion</p><small>Scénario agence · 5 clients</small></article><article><strong><AnimatedNumber value={3} prefix="×" duration={1300}/></strong><p>plus de variantes publiées</p><small>Scénario créateur · 4 réseaux</small></article><article><strong><AnimatedNumber value={24} prefix="+" suffix="%" duration={1500}/></strong><p>de vues hebdomadaires</p><small>Projection issue du tableau de bord démo</small></article></div><p className="cs3-results-disclaimer">Ces chiffres illustrent des scénarios de démonstration. Les résultats réels dépendent du contenu, de l’audience et des plateformes.</p></section>
 
       <section className="cs3-comparison"><div className="cs3-section-tag">COMPARER LES OFFRES</div><h2>Le bon niveau de puissance,<br />sans payer pour le reste.</h2><div className="cs3-comparison-table" role="table" aria-label="Comparaison des offres ClipScale"><div className="head" role="row"><span role="columnheader">Fonctionnalité</span>{plans.map((plan) => <b role="columnheader" key={plan.name}>{plan.name}<small>{plan.price}€/mois</small></b>)}</div>{[["Clips par mois","30","150","Illimités"],["Réseaux connectés","4","10","10"],["Membres inclus","1","3","10"],["Analyse virale","✓","✓","✓"],["Variantes par réseau","—","✓","✓"],["Espaces clients","—","—","✓"],["Support","Email","Prioritaire","Dédié"]].map((row) => <div role="row" key={row[0]}><span role="cell">{row[0]}</span>{row.slice(1).map((cell,index) => <b role="cell" key={`${row[0]}-${index}`}>{cell}</b>)}</div>)}</div></section>
 
-      <section className="cs3-pricing" id="pricing"><div className="cs3-section-tag">DES OFFRES QUI ÉVOLUENT AVEC VOUS</div><div className="cs3-pricing-head"><h2>Commencez simplement.<br /><em>Passez à l’échelle.</em></h2><p>Chaque formule inclut le cockpit de production, l’analyse virale et la préparation multicanale.</p></div><div className="cs3-pricing-grid">{plans.map((plan) => <article key={plan.name} className={plan.popular ? "popular" : ""}>{plan.popular && <span className="cs3-popular-label">LE PLUS CHOISI</span>}<header><span>{plan.name}</span><p>{plan.description}</p></header><div className="cs3-price"><strong>{plan.price}€</strong><small>/ mois<br />HT</small></div><ul>{plan.features.map((feature) => <li key={feature}><i>✓</i>{feature}</li>)}</ul><button type="button" onClick={() => launch(plan.name, true)}>{plan.cta}<span>→</span></button><small>Sans engagement · Annulation à tout moment</small></article>)}</div><p className="cs3-pricing-note">Le paiement sécurisé sera activé via Stripe. Créez votre compte pour préparer votre espace dès maintenant.</p></section>
+      <section className="cs3-pricing" id="pricing"><div className="cs3-section-tag">DES OFFRES QUI ÉVOLUENT AVEC VOUS</div><div className="cs3-pricing-head"><h2>Commencez simplement.<br /><em>Passez à l’échelle.</em></h2><p>Chaque formule inclut le cockpit de production, l’analyse virale et la préparation multicanale.</p></div><div className="cs3-pricing-grid">{plans.map((plan) => <article key={plan.name} className={plan.popular ? "popular" : ""}>{plan.popular && <span className="cs3-popular-label">LE PLUS CHOISI</span>}<header><span>{plan.name}</span><p>{plan.description}</p></header><div className="cs3-price"><strong><AnimatedNumber value={plan.price} suffix="€" /></strong><small>/ mois<br />HT</small></div><ul>{plan.features.map((feature) => <li key={feature}><i>✓</i>{feature}</li>)}</ul><button type="button" onClick={() => launch(plan.name, true)}>{plan.cta}<span>→</span></button><small>Sans engagement · Annulation à tout moment</small></article>)}</div><p className="cs3-pricing-note">Le paiement sécurisé sera activé via Stripe. Créez votre compte pour préparer votre espace dès maintenant.</p></section>
 
       <section className="cs3-faq"><div><div className="cs3-section-tag">QUESTIONS FRÉQUENTES</div><h2>Tout ce qu’il faut savoir<br />avant de démarrer.</h2><p>Une question qui manque ? Le support est disponible directement dans l’application.</p></div><div className="cs3-faq-list">{[["ClipScale publie-t-il réellement sur mes réseaux ?","La connexion officielle de chaque plateforme sera nécessaire. ClipScale prépare déjà les variantes et le calendrier ; l’envoi réel sera activé réseau par réseau après validation OAuth."],["Mes vidéos sont-elles sécurisées ?","Oui. Le stockage est privé et chaque fichier est isolé par utilisateur. Les autres clients ne peuvent pas accéder à vos vidéos."],["Puis-je essayer sans payer ?","Oui. Votre espace démarre avec 14 jours d’essai. Stripe sera connecté à la dernière étape avant l’ouverture des abonnements payants."],["Le score viral garantit-il des vues ?","Non. Il s’agit d’une estimation qui aide à améliorer le format, l’accroche et la rétention. Aucun outil ne peut garantir la viralité."],["Puis-je gérer plusieurs clients ?","Oui, l’offre Agency prévoit plusieurs membres, des espaces clients et un suivi centralisé des validations."]].map(([question,answer],index) => <article className={openFaq === index ? "open" : ""} key={question}><button type="button" aria-expanded={openFaq === index} onClick={() => setOpenFaq(openFaq === index ? -1 : index)}><span>{question}</span><b>{openFaq === index ? "−" : "+"}</b></button>{openFaq === index && <p>{answer}</p>}</article>)}</div></section>
 
@@ -360,7 +388,7 @@ function AppShell({ exit, plan, userId, signOut }: { exit: () => void; plan: str
             <div className="cs2-kpis"><article><span>À valider</span><strong><AnimatedNumber value={7} /></strong><small>clips en attente</small></article><article><span>En production</span><strong><AnimatedNumber value={18} /></strong><small>clips en cours</small></article><article><span>À publier</span><strong><AnimatedNumber value={4} /></strong><small>clips approuvés</small></article><article><span>Missions actives</span><strong><AnimatedNumber value={missions.length} /></strong><small>dont 1 urgente</small></article></div>
             <section className="cs2-paid-dashboard" aria-label="Performances du compte abonné">
               <div className="cs2-paid-dashboard-head"><div><span>PERFORMANCES · 7 DERNIERS JOURS</span><h2>Vos contenus accélèrent.</h2><p>Les statistiques avancées sont accessibles avec votre abonnement {plan}.</p></div><div className="cs2-live-badge"><i /> Données synchronisées</div></div>
-              <div className="cs2-growth-kpis"><article><span>Vues cumulées</span><strong><AnimatedNumber value={38200} /></strong><small>↗ 24,8% cette semaine</small></article><article><span>Taux d’engagement</span><strong><AnimatedNumber value={8} suffix=",4%" /></strong><small>↗ 1,2 point</small></article><article><span>Abonnés gagnés</span><strong>+<AnimatedNumber value={1284} /></strong><small>↗ 18,6% cette semaine</small></article></div>
+              <div className="cs2-growth-kpis"><article><span>Vues cumulées</span><strong><AnimatedNumber value={38200} /></strong><small>↗ 24,8% cette semaine</small></article><article><span>Taux d’engagement</span><strong><AnimatedNumber value={8.4} decimals={1} suffix="%" /></strong><small>↗ 1,2 point</small></article><article><span>Abonnés gagnés</span><strong><AnimatedNumber value={1284} prefix="+" /></strong><small>↗ 18,6% cette semaine</small></article></div>
               <div className="cs2-chart-card"><header><div><b>Évolution des vues</b><span>Instagram · TikTok · YouTube · Facebook</span></div><strong>+25%</strong></header><PerformanceChart /></div>
               <div className="cs2-channel-performance">{[["instagram",42],["tiktok",31],["youtube",18],["facebook",9]].map(([id, share]) => { const network = socialPlatforms.find((item) => item.id === id)!; return <article key={String(id)}><SocialIcon platform={network}/><div><b>{network.name}</b><span><i style={{width:`${share}%`}}/></span></div><strong>{share}%</strong></article>; })}</div>
             </section>
