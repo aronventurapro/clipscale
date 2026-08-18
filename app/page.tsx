@@ -1,26 +1,34 @@
 "use client";
 
 import { useMemo, useState, type ChangeEvent, type CSSProperties, type KeyboardEvent } from "react";
+import { SiBluesky, SiFacebook, SiInstagram, SiLinkedin, SiPinterest, SiSnapchat, SiTelegram, SiThreads, SiTiktok, SiYoutube } from "react-icons/si";
 import "./clipscale-v2.css";
 
 type View = "overview" | "missions" | "clips" | "virality" | "publish" | "team" | "settings";
 type MissionStatus = "En production" | "À valider" | "Planifiée";
 type VideoMeta = { name: string; duration: number; width: number; height: number; size: number };
 type ViralAnalysis = { score: number; verdict: string; summary: string; factors: { label: string; score: number; detail: string }[]; improvements: string[] };
-type SocialPlatform = { id: string; name: string; short: string; tone: string; format: string };
+type SocialPlatform = { id: string; name: string; short: string; tone: string; format: string; ratio: string; recommendedLength: number; tips: string[] };
 
 const socialPlatforms: SocialPlatform[] = [
-  { id: "instagram", name: "Instagram", short: "IG", tone: "instagram", format: "Reels · 9:16" },
-  { id: "tiktok", name: "TikTok", short: "TT", tone: "tiktok", format: "Vidéo · 9:16" },
-  { id: "youtube", name: "YouTube", short: "YT", tone: "youtube", format: "Shorts ou vidéo" },
-  { id: "facebook", name: "Facebook", short: "FB", tone: "facebook", format: "Reels ou vidéo" },
-  { id: "linkedin", name: "LinkedIn", short: "in", tone: "linkedin", format: "Vidéo native" },
-  { id: "threads", name: "Threads", short: "@", tone: "threads", format: "Publication vidéo" },
-  { id: "pinterest", name: "Pinterest", short: "P", tone: "pinterest", format: "Épingle vidéo" },
-  { id: "snapchat", name: "Snapchat", short: "SC", tone: "snapchat", format: "Spotlight" },
-  { id: "telegram", name: "Telegram", short: "TG", tone: "telegram", format: "Canal ou groupe" },
-  { id: "bluesky", name: "Bluesky", short: "BS", tone: "bluesky", format: "Publication vidéo" },
+  { id: "instagram", name: "Instagram", short: "IG", tone: "instagram", format: "Reel vertical", ratio: "9:16", recommendedLength: 500, tips: ["Accroche visible dès la première image", "3 à 5 hashtags vraiment pertinents"] },
+  { id: "tiktok", name: "TikTok", short: "TT", tone: "tiktok", format: "Vidéo verticale", ratio: "9:16", recommendedLength: 300, tips: ["Ton direct et naturel", "Terminez par une question simple"] },
+  { id: "youtube", name: "YouTube", short: "YT", tone: "youtube", format: "Short ou vidéo", ratio: "9:16", recommendedLength: 500, tips: ["Titre clair avec le bénéfice principal", "Ajoutez une invitation à s’abonner"] },
+  { id: "facebook", name: "Facebook", short: "FB", tone: "facebook", format: "Reel ou vidéo", ratio: "9:16", recommendedLength: 500, tips: ["Donnez du contexte en une phrase", "Favorisez une question ouverte"] },
+  { id: "linkedin", name: "LinkedIn", short: "in", tone: "linkedin", format: "Vidéo native", ratio: "4:5", recommendedLength: 600, tips: ["Reliez la vidéo à un apprentissage métier", "Aérez le texte en paragraphes courts"] },
+  { id: "threads", name: "Threads", short: "@", tone: "threads", format: "Post vidéo", ratio: "9:16", recommendedLength: 350, tips: ["Écrivez comme une conversation", "Gardez une seule idée forte"] },
+  { id: "pinterest", name: "Pinterest", short: "P", tone: "pinterest", format: "Épingle vidéo", ratio: "2:3", recommendedLength: 400, tips: ["Promesse utile et recherchable", "Ajoutez des mots-clés précis"] },
+  { id: "snapchat", name: "Snapchat", short: "SC", tone: "snapchat", format: "Spotlight", ratio: "9:16", recommendedLength: 150, tips: ["Message très court", "Le visuel doit se comprendre sans contexte"] },
+  { id: "telegram", name: "Telegram", short: "TG", tone: "telegram", format: "Canal ou groupe", ratio: "9:16", recommendedLength: 700, tips: ["Ajoutez le contexte utile", "Terminez par un lien ou une action"] },
+  { id: "bluesky", name: "Bluesky", short: "BS", tone: "bluesky", format: "Post vidéo", ratio: "9:16", recommendedLength: 280, tips: ["Soyez concis", "Placez l’idée principale au début"] },
 ];
+
+const platformIcons = { instagram: SiInstagram, tiktok: SiTiktok, youtube: SiYoutube, facebook: SiFacebook, linkedin: SiLinkedin, threads: SiThreads, pinterest: SiPinterest, snapchat: SiSnapchat, telegram: SiTelegram, bluesky: SiBluesky };
+
+function SocialIcon({ platform }: { platform: SocialPlatform }) {
+  const Icon = platformIcons[platform.id as keyof typeof platformIcons];
+  return <span className={`cs2-social-icon ${platform.tone}`} aria-hidden="true"><Icon /></span>;
+}
 
 const initialMissions = [
   { id: 1, client: "Nova Studio", title: "Podcast Fondateurs #12", clips: "7 / 12", due: "Aujourd’hui", status: "À valider" as MissionStatus, tone: "violet" },
@@ -90,11 +98,11 @@ function Landing({ launch }: { launch: () => void }) {
             <div className="cs3-video-art"><div className="cs3-video-grid" /><span className="cs3-play">▶</span><div className="cs3-caption"><small>LE DÉCLIC QUI</small><strong>CHANGE TOUT.</strong></div><em>00:24</em></div>
             <div className="cs3-phone-bottom"><span><b>9:16</b><small>Format</small></span><span><b>24 s</b><small>Durée</small></span><span><b>1080p</b><small>Qualité</small></span></div>
           </div>
-          <div className="cs3-network-stack">{socialPlatforms.slice(0, 5).map((item, index) => <span key={item.id} className={`cs2-social-icon ${item.tone}`} style={{ "--stack": index } as CSSProperties}>{item.short}</span>)}</div>
+          <div className="cs3-network-stack">{socialPlatforms.slice(0, 5).map((item, index) => <span key={item.id} style={{ "--stack": index } as CSSProperties}><SocialIcon platform={item} /></span>)}</div>
         </div>
       </section>
 
-      <section className="cs3-marquee" aria-label="Réseaux proposés dans le parcours de publication"><p className="cs3-sr-only">Instagram, TikTok, YouTube, Facebook, LinkedIn, Threads, Pinterest, Snapchat, Telegram et Bluesky.</p><div aria-hidden="true">{[...socialPlatforms, ...socialPlatforms].map((item, index) => <span key={`${item.id}-${index}`}><i className={`cs2-social-icon ${item.tone}`}>{item.short}</i>{item.name}<b>✦</b></span>)}</div></section>
+      <section className="cs3-marquee" aria-label="Réseaux proposés dans le parcours de publication"><p className="cs3-sr-only">Instagram, TikTok, YouTube, Facebook, LinkedIn, Threads, Pinterest, Snapchat, Telegram et Bluesky.</p><div aria-hidden="true">{[...socialPlatforms, ...socialPlatforms].map((item, index) => <span key={`${item.id}-${index}`}><SocialIcon platform={item} />{item.name}<b>✦</b></span>)}</div></section>
 
       <section className="cs3-value" id="product">
         <div className="cs3-section-tag">LE CHAOS S’ARRÊTE ICI</div>
@@ -106,14 +114,14 @@ function Landing({ launch }: { launch: () => void }) {
         <div className="cs3-spotlight-copy"><div className="cs3-section-tag">LE PRODUIT EN ACTION</div><h2>Trois fonctions clés.<br /><em>Un seul espace.</em></h2><p>Chaque vue répond à une tâche précise : améliorer, diffuser ou piloter.</p><div className="cs3-tabs" role="tablist" aria-label="Démonstrations du produit">{spotlightTabs.map((tab, index) => <button type="button" id={`tab-${tab}`} key={tab} role="tab" aria-controls={`panel-${tab}`} aria-selected={spotlight === tab} tabIndex={spotlight === tab ? 0 : -1} className={spotlight === tab ? "active" : ""} onClick={() => setSpotlight(tab)} onKeyDown={(event) => navigateSpotlight(event, tab)}><b>0{index + 1}</b><span>{tab === "analyse" ? "Analyse virale" : tab === "publication" ? "Publication multicanale" : "Pilotage d’agence"}</span></button>)}</div></div>
         <div className="cs3-feature-screen" aria-live="polite">
           {spotlight === "analyse" && <div id="panel-analyse" role="tabpanel" aria-labelledby="tab-analyse" className="cs3-screen-inner cs3-analysis-demo"><header><span>✦ ANALYSE AUTOMATIQUE</span><b>Diagnostic terminé</b></header><div className="cs3-demo-score"><div><strong>87</strong><small>/100</small></div><span><b>Fort potentiel</b><p>Le format et la durée favorisent la rétention.</p></span></div>{[["Accroche",92],["Durée",88],["Format",96],["Qualité",82]].map(([label, score]) => <div className="cs3-demo-factor" key={label}><span>{label}</span><i><b style={{ width: `${score}%` }} /></i><strong>{score}%</strong></div>)}<aside><b>↗ Priorité n°1</b><p>Affichez votre accroche dès la première image.</p></aside></div>}
-          {spotlight === "publication" && <div id="panel-publication" role="tabpanel" aria-labelledby="tab-publication" className="cs3-screen-inner cs3-publish-demo"><header><span>↑ PUBLICATION MULTICANALE</span><b>4 destinations</b></header><div className="cs3-upload-demo"><span>▶</span><div><b>clip-final-v3.mp4</b><small>9:16 · 24 secondes · Prêt</small></div><em>✓</em></div><h3>Choisissez vos réseaux</h3><div className="cs3-demo-networks">{socialPlatforms.slice(0, 8).map((item, index) => <span key={item.id} className={index < 4 ? "active" : ""}><i className={`cs2-social-icon ${item.tone}`}>{item.short}</i><b>{item.name}</b><em>{index < 4 ? "✓" : "+"}</em></span>)}</div><div className="cs3-demo-cta">Préparer 4 publications →</div></div>}
+          {spotlight === "publication" && <div id="panel-publication" role="tabpanel" aria-labelledby="tab-publication" className="cs3-screen-inner cs3-publish-demo"><header><span>↑ PUBLICATION MULTICANALE</span><b>4 destinations</b></header><div className="cs3-upload-demo"><span>▶</span><div><b>clip-final-v3.mp4</b><small>9:16 · 24 secondes · Prêt</small></div><em>✓</em></div><h3>Choisissez vos réseaux</h3><div className="cs3-demo-networks">{socialPlatforms.slice(0, 8).map((item, index) => <span key={item.id} className={index < 4 ? "active" : ""}><SocialIcon platform={item} /><b>{item.name}</b><em>{index < 4 ? "✓" : "+"}</em></span>)}</div><div className="cs3-demo-cta">Préparer 4 publications →</div></div>}
           {spotlight === "pilotage" && <div id="panel-pilotage" role="tabpanel" aria-labelledby="tab-pilotage" className="cs3-screen-inner cs3-pilot-demo"><header><span>⌂ VUE D’ENSEMBLE</span><b>En direct</b></header><div className="cs3-demo-kpis"><span><small>À VALIDER</small><strong>7</strong><em>clips</em></span><span><small>EN PRODUCTION</small><strong>18</strong><em>clips</em></span><span><small>À PUBLIER</small><strong>4</strong><em>clips</em></span></div><h3>Priorités du jour</h3>{["Valider 7 clips pour Nova Studio","Compléter le brief Maison Lune","Programmer 4 publications"].map((item, index) => <div className="cs3-demo-task" key={item}><i>{index + 1}</i><span><b>{item}</b><small>{index === 0 ? "Urgent · aujourd’hui" : index === 1 ? "Brief incomplet" : "Instagram · TikTok · YouTube · Facebook"}</small></span><em>→</em></div>)}</div>}
         </div>
       </section>
 
       <section className="cs3-workflow" id="workflow"><div className="cs3-section-tag">SIMPLE PAR CONCEPTION</div><h2>De la vidéo brute à la diffusion.<br /><em>Sans changer d’outil.</em></h2><div className="cs3-flow-line"><i /></div><div className="cs3-flow-grid"><article><span>01</span><b>Centralisez</b><p>Créez la mission, assignez l’équipe et rassemblez les versions.</p></article><article><span>02</span><b>Optimisez</b><p>Analysez la vidéo et appliquez les recommandations prioritaires.</p></article><article><span>03</span><b>Validez</b><p>Gardez les retours client rattachés à la bonne version.</p></article><article><span>04</span><b>Diffusez</b><p>Sélectionnez vos réseaux et préparez toutes les publications.</p></article></div></section>
 
-      <section className="cs3-bento"><article className="cs3-bento-large"><span>POUR LES AGENCES</span><h2>Plus de capacité.<br />Moins de coordination.</h2><p>Votre équipe voit ses priorités. Vos clients voient l’avancement. Vous gardez la maîtrise.</p><div><b><strong>1</strong><small>cockpit</small></b><b><strong>10</strong><small>réseaux</small></b><b><strong>0</strong><small>tableur</small></b></div></article><article className="cs3-bento-dark"><span>VIRALITÉ</span><div className="cs3-mini-ring">87</div><h3>Comprenez avant de publier.</h3><p>Accroche, format, durée et qualité expliqués clairement.</p></article><article className="cs3-bento-purple"><span>DIFFUSION</span><div className="cs3-bento-icons">{socialPlatforms.slice(0, 4).map((item) => <i className={`cs2-social-icon ${item.tone}`} key={item.id}>{item.short}</i>)}</div><h3>Publiez sans vous répéter.</h3><p>Une préparation unique pour tous vos canaux.</p></article></section>
+      <section className="cs3-bento"><article className="cs3-bento-large"><span>POUR LES AGENCES</span><h2>Plus de capacité.<br />Moins de coordination.</h2><p>Votre équipe voit ses priorités. Vos clients voient l’avancement. Vous gardez la maîtrise.</p><div><b><strong>1</strong><small>cockpit</small></b><b><strong>10</strong><small>réseaux</small></b><b><strong>0</strong><small>tableur</small></b></div></article><article className="cs3-bento-dark"><span>VIRALITÉ</span><div className="cs3-mini-ring">87</div><h3>Comprenez avant de publier.</h3><p>Accroche, format, durée et qualité expliqués clairement.</p></article><article className="cs3-bento-purple"><span>DIFFUSION</span><div className="cs3-bento-icons">{socialPlatforms.slice(0, 4).map((item) => <SocialIcon platform={item} key={item.id} />)}</div><h3>Publiez sans vous répéter.</h3><p>Une préparation unique pour tous vos canaux.</p></article></section>
 
       <section className="cs3-final"><div className="cs3-final-orb" /><span>PRÊT À SIMPLIFIER VOTRE PRODUCTION ?</span><h2>Votre prochaine vidéo mérite<br /><em>mieux qu’un tableur.</em></h2><p>Testez le parcours complet : pilotage, analyse virale et préparation multicanale.</p><button type="button" className="cs3-primary" onClick={launch}>Tester ClipScale maintenant <b aria-hidden="true">→</b></button><small>Accès immédiat · Aucun paiement · Données fictives</small></section>
       <footer className="cs3-footer"><Logo /><p>Le cockpit de croissance des agences de clipping.</p><div><a href="/mentions-legales">Mentions légales</a><a href="/confidentialite">Confidentialité</a><span>© 2026 ClipScale</span></div></footer>
@@ -140,9 +148,13 @@ function AppShell({ exit }: { exit: () => void }) {
   const [analysis, setAnalysis] = useState<ViralAnalysis | null>(null);
   const [publishUrl, setPublishUrl] = useState("");
   const [publishFileName, setPublishFileName] = useState("");
+  const [publishVideoMeta, setPublishVideoMeta] = useState<VideoMeta | null>(null);
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(["instagram", "tiktok", "youtube", "facebook"]);
   const [publishCaption, setPublishCaption] = useState("");
   const [youtubeTitle, setYoutubeTitle] = useState("");
+  const [platformCopies, setPlatformCopies] = useState<Record<string, string>>({});
+  const [activeCustomize, setActiveCustomize] = useState("instagram");
+  const [adaptedPlatforms, setAdaptedPlatforms] = useState<string[]>([]);
   const [publishMode, setPublishMode] = useState<"now" | "schedule">("now");
   const [scheduledAt, setScheduledAt] = useState("");
   const [showConnect, setShowConnect] = useState(false);
@@ -194,11 +206,44 @@ function AppShell({ exit }: { exit: () => void }) {
     const file = event.target.files?.[0];
     if (!file) return;
     if (publishUrl) URL.revokeObjectURL(publishUrl);
-    setPublishUrl(URL.createObjectURL(file));
+    const url = URL.createObjectURL(file);
+    setPublishUrl(url);
     setPublishFileName(file.name);
+    setPublishVideoMeta(null);
+    const probe = document.createElement("video");
+    probe.preload = "metadata";
+    probe.onloadedmetadata = () => setPublishVideoMeta({ name: file.name, duration: Math.round(probe.duration), width: probe.videoWidth, height: probe.videoHeight, size: file.size });
+    probe.src = url;
   };
-  const togglePlatform = (id: string) => setSelectedPlatforms((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
-  const publishReady = Boolean(publishUrl && publishCaption.trim() && selectedPlatforms.length && (!selectedPlatforms.includes("youtube") || youtubeTitle.trim()) && (publishMode === "now" || scheduledAt));
+  const togglePlatform = (id: string) => setSelectedPlatforms((current) => {
+    const next = current.includes(id) ? current.filter((item) => item !== id) : [...current, id];
+    if (!next.includes(activeCustomize)) setActiveCustomize(next[0] ?? "instagram");
+    return next;
+  });
+  const buildPlatformCopy = (id: string) => {
+    const base = publishCaption.trim();
+    if (id === "instagram") return `${base}\n\n#reels #video #creation`;
+    if (id === "tiktok") return `${base.slice(0, 240)}\n\nVous feriez quoi à ma place ? #pourtoi #createur`;
+    if (id === "youtube") return `${base}\n\nAbonnez-vous pour découvrir les prochaines vidéos.`;
+    if (id === "facebook") return `${base}\n\nQu’en pensez-vous ? Dites-le-nous en commentaire.`;
+    if (id === "linkedin") return `Un apprentissage à retenir :\n\n${base}\n\nEt vous, comment abordez-vous ce sujet ?`;
+    if (id === "threads") return `${base.slice(0, 280)}\n\nVotre avis ?`;
+    if (id === "pinterest") return `${base}\n\nEnregistrez cette vidéo pour la retrouver plus tard.`;
+    if (id === "snapchat") return base.slice(0, 140);
+    if (id === "telegram") return `${base}\n\nPartagez cette vidéo à une personne que cela peut aider.`;
+    return `${base.slice(0, 240)}\n\nQu’en pensez-vous ?`;
+  };
+  const adaptCopies = () => {
+    if (!publishCaption.trim() || !selectedPlatforms.length) return;
+    setPlatformCopies((current) => Object.fromEntries(selectedPlatforms.map((id) => [id, current[id] || buildPlatformCopy(id)])));
+    setAdaptedPlatforms([...selectedPlatforms]);
+    setActiveCustomize(selectedPlatforms.includes(activeCustomize) ? activeCustomize : selectedPlatforms[0]);
+    if (selectedPlatforms.includes("youtube") && !youtubeTitle.trim()) setYoutubeTitle(publishCaption.trim().split(/[.!?\n]/)[0].slice(0, 80));
+    notify(`${selectedPlatforms.length} variante${selectedPlatforms.length > 1 ? "s" : ""} prête${selectedPlatforms.length > 1 ? "s" : ""}`);
+  };
+  const activePlatform = socialPlatforms.find((item) => item.id === activeCustomize) ?? socialPlatforms[0];
+  const allCopiesReady = selectedPlatforms.length > 0 && selectedPlatforms.every((id) => adaptedPlatforms.includes(id) && platformCopies[id]?.trim());
+  const publishReady = Boolean(publishUrl && publishCaption.trim() && allCopiesReady && (!selectedPlatforms.includes("youtube") || youtubeTitle.trim()) && (publishMode === "now" || scheduledAt));
 
   return (
     <div className="cs2-app">
@@ -257,24 +302,36 @@ function AppShell({ exit }: { exit: () => void }) {
 
           {view === "publish" && <>
             <div className="cs2-page-title cs2-publish-title"><div><span>DIFFUSION MULTICANALE</span><h1>Publiez partout, en une fois.</h1><p>Ajoutez votre vidéo, choisissez les réseaux et préparez une publication groupée.</p></div><span className="cs2-setup-badge">Mode configuration</span></div>
-            <div className="cs2-publish-steps" aria-label="Étapes de publication"><span className={publishUrl ? "done" : "active"}><b>{publishUrl ? "✓" : "1"}</b> Vidéo</span><i /><span className={publishUrl ? "active" : ""}><b>2</b> Réseaux</span><i /><span className={publishCaption ? "active" : ""}><b>3</b> Message</span><i /><span><b>4</b> Publication</span></div>
+            <div className="cs2-publish-guide"><span>4 étapes guidées</span><p>Rien n’est publié sans votre confirmation. Chaque texte reste modifiable avant l’envoi.</p></div>
+            <div className="cs2-publish-steps" aria-label="Étapes de publication"><span className={publishUrl ? "done" : "active"}><b>{publishUrl ? "✓" : "1"}</b> Vidéo</span><i /><span className={selectedPlatforms.length ? "done" : publishUrl ? "active" : ""}><b>{selectedPlatforms.length ? "✓" : "2"}</b> Réseaux</span><i /><span className={allCopiesReady ? "done" : publishCaption ? "active" : ""}><b>{allCopiesReady ? "✓" : "3"}</b> Variantes</span><i /><span className={publishReady ? "active" : ""}><b>4</b> Confirmation</span></div>
             <div className="cs2-publish-layout">
               <div className="cs2-publish-main">
                 <section className="cs2-panel cs2-publish-section">
-                  <div className="cs2-publish-section-head"><span>1</span><div><h2>Ajoutez votre vidéo</h2><p>Un seul fichier sera adapté aux réseaux sélectionnés.</p></div>{publishUrl && <b>Prête</b>}</div>
-                  {!publishUrl ? <label className="cs2-publish-drop"><input type="file" accept="video/mp4,video/quicktime,video/webm" onChange={selectPublishVideo} /><span>↑</span><strong>Déposez votre vidéo ici</strong><small>MP4, MOV ou WebM · vertical 9:16 recommandé</small><b>Choisir une vidéo</b></label> : <div className="cs2-publish-preview"><video src={publishUrl} controls playsInline /><div><span>VIDÉO AJOUTÉE</span><strong>{publishFileName}</strong><small>Utilisez l’aperçu pour vérifier le son et le cadrage.</small><label>Remplacer la vidéo<input type="file" accept="video/mp4,video/quicktime,video/webm" onChange={selectPublishVideo} /></label></div></div>}
+                  <div className="cs2-publish-section-head"><span>1</span><div><h2>Ajoutez votre vidéo</h2><p>Importez le fichier final. ClipScale vérifie son cadrage avant la préparation.</p></div>{publishUrl && <b>Prête</b>}</div>
+                  {!publishUrl ? <label className="cs2-publish-drop"><input type="file" accept="video/mp4,video/quicktime,video/webm" onChange={selectPublishVideo} /><span>↑</span><strong>Déposez votre vidéo ici</strong><small>MP4, MOV ou WebM · vertical 9:16 recommandé</small><b>Choisir une vidéo</b></label> : <div className="cs2-publish-preview"><video src={publishUrl} controls playsInline /><div><span>VIDÉO AJOUTÉE</span><strong>{publishFileName}</strong><small>{publishVideoMeta ? `${publishVideoMeta.width} × ${publishVideoMeta.height} px · ${publishVideoMeta.duration} s · ${(publishVideoMeta.size / 1048576).toFixed(1)} Mo` : "Lecture des informations…"}</small><small>{publishVideoMeta && publishVideoMeta.height <= publishVideoMeta.width ? "⚠ Format horizontal : vérifiez le recadrage avant l’envoi." : "✓ Le format vertical convient à Reels, TikTok et Shorts."}</small><label>Remplacer la vidéo<input type="file" accept="video/mp4,video/quicktime,video/webm" onChange={selectPublishVideo} /></label></div></div>}
                 </section>
 
                 <section className="cs2-panel cs2-publish-section">
-                  <div className="cs2-publish-section-head"><span>2</span><div><h2>Choisissez les réseaux</h2><p>Cochez chaque destination. Vous connecterez les comptes avant le premier envoi.</p></div><button onClick={() => setSelectedPlatforms(selectedPlatforms.length === socialPlatforms.length ? [] : socialPlatforms.map((item) => item.id))}>{selectedPlatforms.length === socialPlatforms.length ? "Tout retirer" : "Tout sélectionner"}</button></div>
-                  <div className="cs2-platform-grid">{socialPlatforms.map((item) => { const checked = selectedPlatforms.includes(item.id); return <button type="button" key={item.id} className={checked ? "selected" : ""} aria-pressed={checked} onClick={() => togglePlatform(item.id)}><span className={`cs2-social-icon ${item.tone}`}>{item.short}</span><span><b>{item.name}</b><small>{item.format}</small></span><i>{checked ? "✓" : "+"}</i></button>; })}</div>
+                  <div className="cs2-publish-section-head"><span>2</span><div><h2>Choisissez les réseaux</h2><p>Cochez les destinations voulues. Chaque carte indique le format recommandé.</p></div><button onClick={() => { const next = selectedPlatforms.length === socialPlatforms.length ? [] : socialPlatforms.map((item) => item.id); setSelectedPlatforms(next); setActiveCustomize(next[0] ?? "instagram"); }}>{selectedPlatforms.length === socialPlatforms.length ? "Tout retirer" : "Tout sélectionner"}</button></div>
+                  <div className="cs2-selection-count"><b>{selectedPlatforms.length}</b> destination{selectedPlatforms.length > 1 ? "s" : ""} sélectionnée{selectedPlatforms.length > 1 ? "s" : ""}</div>
+                  <div className="cs2-platform-grid">{socialPlatforms.map((item) => { const checked = selectedPlatforms.includes(item.id); return <button type="button" key={item.id} className={checked ? "selected" : ""} aria-pressed={checked} aria-label={`${checked ? "Retirer" : "Ajouter"} ${item.name}`} onClick={() => togglePlatform(item.id)}><SocialIcon platform={item} /><span><b>{item.name}</b><small>{item.format} · {item.ratio}</small></span><i>{checked ? "✓" : "+"}</i></button>; })}</div>
                 </section>
 
                 <section className="cs2-panel cs2-publish-section">
-                  <div className="cs2-publish-section-head"><span>3</span><div><h2>Préparez le message</h2><p>Commencez avec un texte commun, puis ajustez les champs obligatoires.</p></div></div>
-                  <label className="cs2-publish-field">Légende commune<textarea value={publishCaption} onChange={(event) => setPublishCaption(event.target.value)} maxLength={2200} placeholder="Écrivez une accroche claire, apportez la valeur, puis terminez par un appel à l’action…" /><small>{publishCaption.length}/2200</small></label>
-                  {selectedPlatforms.includes("youtube") && <label className="cs2-publish-field">Titre YouTube <em>Obligatoire</em><input value={youtubeTitle} onChange={(event) => setYoutubeTitle(event.target.value)} maxLength={100} placeholder="Ex. 3 erreurs qui bloquent votre croissance" /><small>{youtubeTitle.length}/100</small></label>}
-                  <div className="cs2-format-tip"><span>✦</span><p><b>Conseil ClipScale</b> Gardez le texte important au centre, ajoutez des sous-titres et évitez les filigranes d’une autre plateforme.</p></div>
+                  <div className="cs2-publish-section-head"><span>3</span><div><h2>Adaptez le message</h2><p>Écrivez l’idée principale une seule fois, puis générez une variante pour chaque réseau.</p></div>{allCopiesReady && <b>Variantes prêtes</b>}</div>
+                  <label className="cs2-publish-field">Message de départ<textarea value={publishCaption} onChange={(event) => { setPublishCaption(event.target.value); setAdaptedPlatforms([]); }} maxLength={2200} placeholder="Ex. Cette erreur coûte des heures aux créateurs. Voici comment l’éviter…" /><small>{publishCaption.length}/2200</small></label>
+                  <div className="cs2-adapt-toolbar"><div><b>Une base, plusieurs tons</b><small>ClipScale ajuste la longueur, le style et l’appel à l’action.</small></div><button type="button" className="cs2-adapt-button" disabled={!publishCaption.trim() || !selectedPlatforms.length} onClick={adaptCopies}>✦ Générer {selectedPlatforms.length || "les"} variante{selectedPlatforms.length > 1 ? "s" : ""}</button></div>
+                  {adaptedPlatforms.length > 0 ? <div className="cs2-customize-shell">
+                    <div className="cs2-platform-tabs" role="tablist" aria-label="Variantes par réseau">{socialPlatforms.filter((item) => selectedPlatforms.includes(item.id)).map((item) => <button key={item.id} role="tab" aria-selected={activeCustomize === item.id} className={activeCustomize === item.id ? "active" : ""} onClick={() => setActiveCustomize(item.id)}><SocialIcon platform={item} /><span>{item.name}</span><i>✓</i></button>)}</div>
+                    <div className="cs2-platform-editor" role="tabpanel">
+                      <header><SocialIcon platform={activePlatform} /><div><h3>Version {activePlatform.name}</h3><p>{activePlatform.format} · format conseillé {activePlatform.ratio}</p></div><span>ADAPTÉE</span></header>
+                      {activePlatform.id === "youtube" && <label className="cs2-publish-field">Titre YouTube <em>Obligatoire</em><input value={youtubeTitle} onChange={(event) => setYoutubeTitle(event.target.value)} maxLength={100} placeholder="Ex. 3 erreurs qui bloquent votre croissance" /><small>{youtubeTitle.length}/100</small></label>}
+                      <label className="cs2-publish-field">Texte pour {activePlatform.name}<textarea value={platformCopies[activePlatform.id] ?? ""} onChange={(event) => { setPlatformCopies((current) => ({ ...current, [activePlatform.id]: event.target.value })); setAdaptedPlatforms((current) => current.includes(activePlatform.id) ? current : [...current, activePlatform.id]); }} maxLength={2200} /><small className={(platformCopies[activePlatform.id]?.length ?? 0) > activePlatform.recommendedLength ? "warning" : ""}>{platformCopies[activePlatform.id]?.length ?? 0} / {activePlatform.recommendedLength} conseillés</small></label>
+                      <div className="cs2-platform-requirements"><span><b>{activePlatform.ratio}</b><small>Cadrage</small></span><span><b>CC</b><small>Sous-titres</small></span><span><b>◎</b><small>Zone sûre</small></span></div>
+                      <ul>{activePlatform.tips.map((tip) => <li key={tip}>✓ {tip}</li>)}</ul>
+                    </div>
+                  </div> : <div className="cs2-adapt-empty"><span>✦</span><div><b>Vos variantes apparaîtront ici</b><p>Vous pourrez relire et modifier chaque version avant de continuer.</p></div></div>}
+                  <div className="cs2-format-tip"><span>◎</span><p><b>À vérifier dans la vidéo</b> Gardez le texte important au centre, ajoutez des sous-titres et évitez les filigranes d’une autre plateforme.</p></div>
                 </section>
 
                 <section className="cs2-panel cs2-publish-section">
@@ -288,10 +345,11 @@ function AppShell({ exit }: { exit: () => void }) {
                 <span className="cs2-summary-label">RÉSUMÉ</span><h2>Votre publication</h2>
                 <div className={`cs2-summary-video ${publishUrl ? "has-video" : ""}`}>{publishUrl ? <video src={publishUrl} muted playsInline /> : <><span>▶</span><small>Aucune vidéo</small></>}</div>
                 <div className="cs2-summary-row"><span>Destinations</span><strong>{selectedPlatforms.length}</strong></div>
-                <div className="cs2-summary-networks">{selectedPlatforms.length ? socialPlatforms.filter((item) => selectedPlatforms.includes(item.id)).map((item) => <span className={`cs2-social-icon ${item.tone}`} key={item.id}>{item.short}</span>) : <small>Sélectionnez au moins un réseau.</small>}</div>
+                <div className="cs2-summary-networks">{selectedPlatforms.length ? socialPlatforms.filter((item) => selectedPlatforms.includes(item.id)).map((item) => <SocialIcon platform={item} key={item.id} />) : <small>Sélectionnez au moins un réseau.</small>}</div>
+                <div className="cs2-summary-row"><span>Variantes</span><strong>{adaptedPlatforms.filter((id) => selectedPlatforms.includes(id)).length} / {selectedPlatforms.length || 0} prêtes</strong></div>
                 <div className="cs2-summary-row"><span>Envoi</span><strong>{publishMode === "now" ? "Maintenant" : scheduledAt ? new Date(scheduledAt).toLocaleString("fr-FR", { dateStyle: "medium", timeStyle: "short" }) : "À définir"}</strong></div>
                 <button className="cs2-button cs2-publish-button" disabled={!publishReady} onClick={() => setShowConnect(true)}>{publishMode === "now" ? `Préparer ${selectedPlatforms.length} publication${selectedPlatforms.length > 1 ? "s" : ""}` : `Programmer sur ${selectedPlatforms.length} réseau${selectedPlatforms.length > 1 ? "x" : ""}`} →</button>
-                {!publishReady && <p className="cs2-summary-help">Ajoutez une vidéo, une légende et tous les champs requis.</p>}
+                {!publishReady && <p className="cs2-summary-help">Ajoutez la vidéo, choisissez les réseaux, puis générez et relisez les variantes.</p>}
                 <div className="cs2-real-posting-note"><b>Publication réelle sécurisée</b><p>Chaque réseau demandera votre autorisation officielle. ClipScale ne demande jamais vos mots de passe sociaux.</p></div>
               </aside>
             </div>
@@ -310,7 +368,7 @@ function AppShell({ exit }: { exit: () => void }) {
       </main>
 
       {showCreate && <div className="cs2-modal-backdrop" role="presentation" onMouseDown={(event) => event.currentTarget === event.target && setShowCreate(false)}><div className="cs2-modal" role="dialog" aria-modal="true" aria-labelledby="new-mission-title"><button className="cs2-modal-close" onClick={() => setShowCreate(false)} aria-label="Fermer">×</button><span>NOUVELLE MISSION</span><h2 id="new-mission-title">Que faut-il produire ?</h2><p>Créez la structure de la mission. Vous pourrez compléter le brief ensuite.</p><label>Nom de la mission<input autoFocus placeholder="Ex. Podcast Fondateurs #13" /></label><div className="cs2-form-row"><label>Client<input placeholder="Nom du client" /></label><label>Nombre de clips<input type="number" min="1" defaultValue="6" /></label></div><label>Échéance<input type="date" /></label><div className="cs2-modal-actions"><button onClick={() => setShowCreate(false)}>Annuler</button><button className="cs2-button" onClick={addMission}>Créer la mission</button></div></div></div>}
-      {showConnect && <div className="cs2-modal-backdrop" role="presentation" onMouseDown={(event) => event.currentTarget === event.target && setShowConnect(false)}><div className="cs2-modal cs2-connect-modal" role="dialog" aria-modal="true" aria-labelledby="connect-title"><button className="cs2-modal-close" onClick={() => setShowConnect(false)} aria-label="Fermer">×</button><span>DERNIÈRE ÉTAPE</span><h2 id="connect-title">Connectez vos comptes</h2><p>La publication est prête. Pour envoyer réellement la vidéo, autorisez chaque réseau avec sa fenêtre officielle.</p><div className="cs2-connect-list">{socialPlatforms.filter((item) => selectedPlatforms.includes(item.id)).map((item) => <div key={item.id}><span className={`cs2-social-icon ${item.tone}`}>{item.short}</span><b>{item.name}</b><small>À connecter</small></div>)}</div><div className="cs2-connect-security"><span>✓</span><p><b>Connexion OAuth sécurisée</b><br />Vos identifiants restent chez Instagram, TikTok, Google, Meta et les autres plateformes.</p></div><div className="cs2-modal-actions"><button onClick={() => setShowConnect(false)}>Revenir au brouillon</button><button className="cs2-button" onClick={() => notify("Intégration des comptes prête à être configurée")}>Configurer les connexions</button></div></div></div>}
+      {showConnect && <div className="cs2-modal-backdrop" role="presentation" onMouseDown={(event) => event.currentTarget === event.target && setShowConnect(false)}><div className="cs2-modal cs2-connect-modal" role="dialog" aria-modal="true" aria-labelledby="connect-title"><button className="cs2-modal-close" onClick={() => setShowConnect(false)} aria-label="Fermer">×</button><span>DERNIÈRE ÉTAPE</span><h2 id="connect-title">Connectez vos comptes</h2><p>La publication est prête. Pour envoyer réellement la vidéo, autorisez chaque réseau avec sa fenêtre officielle.</p><div className="cs2-connect-list">{socialPlatforms.filter((item) => selectedPlatforms.includes(item.id)).map((item) => <div key={item.id}><SocialIcon platform={item} /><b>{item.name}</b><small>À connecter</small></div>)}</div><div className="cs2-connect-security"><span>✓</span><p><b>Connexion OAuth sécurisée</b><br />Vos identifiants restent chez Instagram, TikTok, Google, Meta et les autres plateformes.</p></div><div className="cs2-modal-actions"><button onClick={() => setShowConnect(false)}>Revenir au brouillon</button><button className="cs2-button" onClick={() => notify("Intégration des comptes prête à être configurée")}>Configurer les connexions</button></div></div></div>}
       {toast && <div className="cs2-toast" role="status">✓ {toast}</div>}
     </div>
   );
