@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ChangeEvent, type CSSProperties, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent, type CSSProperties, type KeyboardEvent } from "react";
 import { SiBluesky, SiFacebook, SiInstagram, SiLinkedin, SiPinterest, SiSnapchat, SiTelegram, SiThreads, SiTiktok, SiYoutube } from "react-icons/si";
 import "./clipscale-v2.css";
 
@@ -57,7 +57,33 @@ function Logo() {
   return <span className="cs2-logo"><span className="cs2-logo-mark">C</span>ClipScale</span>;
 }
 
-function Landing({ launch }: { launch: () => void }) {
+function AnimatedNumber({ value, suffix = "" }: { value: number; suffix?: string }) {
+  const [display, setDisplay] = useState(0);
+  useEffect(() => {
+    let frame = 0;
+    const started = performance.now();
+    const tick = (now: number) => {
+      const progress = Math.min(1, (now - started) / 900);
+      setDisplay(Math.round(value * (1 - Math.pow(1 - progress, 3))));
+      if (progress < 1) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [value]);
+  return <>{display.toLocaleString("fr-FR")}{suffix}</>;
+}
+
+function PerformanceChart() {
+  return <div className="cs2-performance-chart" role="img" aria-label="Évolution des vues sur les 7 derniers jours, de 12 400 à 38 200 vues"><div className="cs2-chart-y"><span>40k</span><span>30k</span><span>20k</span><span>10k</span><span>0</span></div><div className="cs2-chart-plot"><i /><i /><i /><i /><svg viewBox="0 0 700 210" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#7558e4" stopOpacity=".28"/><stop offset="1" stopColor="#7558e4" stopOpacity="0"/></linearGradient></defs><path className="fill" d="M0 175 C70 160 95 168 150 135 S245 148 300 104 S400 116 455 76 S560 88 610 45 S665 48 700 22 L700 210 L0 210Z"/><path className="line" d="M0 175 C70 160 95 168 150 135 S245 148 300 104 S400 116 455 76 S560 88 610 45 S665 48 700 22"/><circle cx="700" cy="22" r="6"/></svg><div className="cs2-chart-x"><span>Lun</span><span>Mar</span><span>Mer</span><span>Jeu</span><span>Ven</span><span>Sam</span><span>Dim</span></div></div></div>;
+}
+
+const plans = [
+  { name: "Starter", price: 29, description: "Pour publier régulièrement sans perdre de temps.", features: ["1 espace de travail", "30 clips par mois", "4 réseaux connectés", "Analyse de viralité"], cta: "Commencer avec Starter" },
+  { name: "Scale", price: 79, description: "Pour les créateurs et petites équipes qui accélèrent.", features: ["3 membres inclus", "150 clips par mois", "10 réseaux connectés", "Variantes IA par plateforme", "Statistiques avancées"], cta: "Choisir Scale", popular: true },
+  { name: "Agency", price: 149, description: "Pour piloter plusieurs clients depuis un seul cockpit.", features: ["10 membres inclus", "Clips illimités", "Espaces clients", "Publication prioritaire", "Support dédié"], cta: "Passer à Agency" },
+];
+
+function Landing({ launch }: { launch: (plan?: string) => void }) {
   const [spotlight, setSpotlight] = useState<"analyse" | "publication" | "pilotage">("analyse");
   const spotlightTabs = ["analyse", "publication", "pilotage"] as const;
   const navigateSpotlight = (event: KeyboardEvent<HTMLButtonElement>, current: typeof spotlightTabs[number]) => {
@@ -75,8 +101,8 @@ function Landing({ launch }: { launch: () => void }) {
       <div className="cs3-noise" aria-hidden="true" />
       <header className="cs3-header">
         <a href="#top" aria-label="Accueil ClipScale"><Logo /></a>
-        <nav aria-label="Navigation principale"><a href="#product">Produit</a><a href="#workflow">Fonctionnement</a><a href="#features">Fonctionnalités</a></nav>
-        <button type="button" className="cs3-nav-cta" onClick={launch}>Voir la démo <span aria-hidden="true">↗</span></button>
+        <nav aria-label="Navigation principale"><a href="#product">Produit</a><a href="#workflow">Fonctionnement</a><a href="#features">Fonctionnalités</a><a href="#pricing">Tarifs</a></nav>
+        <button type="button" className="cs3-nav-cta" onClick={() => launch()}>Voir la démo <span aria-hidden="true">↗</span></button>
       </header>
 
       <section className="cs3-hero" id="main-content">
@@ -85,7 +111,7 @@ function Landing({ launch }: { launch: () => void }) {
           <div className="cs3-kicker"><span><i /> NOUVEAU</span> Analyse virale et publication multicanale <b aria-hidden="true">→</b></div>
           <h1>Une vidéo.<br /><em>Partout.</em> Plus vite.</h1>
           <p>Centralisez la production, améliorez le potentiel de chaque clip et préparez sa diffusion sur plusieurs réseaux depuis un seul espace.</p>
-          <div className="cs3-actions"><button type="button" className="cs3-primary" onClick={launch}>Tester la démo interactive <span aria-hidden="true">→</span></button><a href="#product">Découvrir le produit <i aria-hidden="true">↓</i></a></div>
+          <div className="cs3-actions"><button type="button" className="cs3-primary" onClick={() => launch()}>Tester la démo interactive <span aria-hidden="true">→</span></button><a href="#product">Découvrir le produit <i aria-hidden="true">↓</i></a></div>
           <div className="cs3-reassurance"><span>✓ Accès immédiat</span><span>✓ Aucune carte bancaire</span><span>✓ Données de démonstration</span></div>
         </div>
 
@@ -123,7 +149,9 @@ function Landing({ launch }: { launch: () => void }) {
 
       <section className="cs3-bento"><article className="cs3-bento-large"><span>POUR LES AGENCES</span><h2>Plus de capacité.<br />Moins de coordination.</h2><p>Votre équipe voit ses priorités. Vos clients voient l’avancement. Vous gardez la maîtrise.</p><div><b><strong>1</strong><small>cockpit</small></b><b><strong>10</strong><small>réseaux</small></b><b><strong>0</strong><small>tableur</small></b></div></article><article className="cs3-bento-dark"><span>VIRALITÉ</span><div className="cs3-mini-ring">87</div><h3>Comprenez avant de publier.</h3><p>Accroche, format, durée et qualité expliqués clairement.</p></article><article className="cs3-bento-purple"><span>DIFFUSION</span><div className="cs3-bento-icons">{socialPlatforms.slice(0, 4).map((item) => <SocialIcon platform={item} key={item.id} />)}</div><h3>Publiez sans vous répéter.</h3><p>Une préparation unique pour tous vos canaux.</p></article></section>
 
-      <section className="cs3-final"><div className="cs3-final-orb" /><span>PRÊT À SIMPLIFIER VOTRE PRODUCTION ?</span><h2>Votre prochaine vidéo mérite<br /><em>mieux qu’un tableur.</em></h2><p>Testez le parcours complet : pilotage, analyse virale et préparation multicanale.</p><button type="button" className="cs3-primary" onClick={launch}>Tester ClipScale maintenant <b aria-hidden="true">→</b></button><small>Accès immédiat · Aucun paiement · Données fictives</small></section>
+      <section className="cs3-pricing" id="pricing"><div className="cs3-section-tag">DES OFFRES QUI ÉVOLUENT AVEC VOUS</div><div className="cs3-pricing-head"><h2>Commencez simplement.<br /><em>Passez à l’échelle.</em></h2><p>Chaque formule inclut le cockpit de production, l’analyse virale et la préparation multicanale.</p></div><div className="cs3-pricing-grid">{plans.map((plan) => <article key={plan.name} className={plan.popular ? "popular" : ""}>{plan.popular && <span className="cs3-popular-label">LE PLUS CHOISI</span>}<header><span>{plan.name}</span><p>{plan.description}</p></header><div className="cs3-price"><strong>{plan.price}€</strong><small>/ mois<br />HT</small></div><ul>{plan.features.map((feature) => <li key={feature}><i>✓</i>{feature}</li>)}</ul><button type="button" onClick={() => launch(plan.name)}>{plan.cta}<span>→</span></button><small>Sans engagement · Annulation à tout moment</small></article>)}</div><p className="cs3-pricing-note">Le paiement sécurisé sera activé via Stripe. Les boutons ouvrent actuellement la démonstration du plan choisi.</p></section>
+
+      <section className="cs3-final"><div className="cs3-final-orb" /><span>PRÊT À SIMPLIFIER VOTRE PRODUCTION ?</span><h2>Votre prochaine vidéo mérite<br /><em>mieux qu’un tableur.</em></h2><p>Testez le parcours complet : pilotage, analyse virale et préparation multicanale.</p><button type="button" className="cs3-primary" onClick={() => launch()}>Tester ClipScale maintenant <b aria-hidden="true">→</b></button><small>Accès immédiat · Aucun paiement · Données fictives</small></section>
       <footer className="cs3-footer"><Logo /><p>Le cockpit de croissance des agences de clipping.</p><div><a href="/mentions-legales">Mentions légales</a><a href="/confidentialite">Confidentialité</a><span>© 2026 ClipScale</span></div></footer>
     </main>
   );
@@ -134,7 +162,7 @@ function Status({ children }: { children: string }) {
   return <span className={`cs2-status ${slug}`}>{children}</span>;
 }
 
-function AppShell({ exit }: { exit: () => void }) {
+function AppShell({ exit, plan }: { exit: () => void; plan: string }) {
   const [view, setView] = useState<View>("overview");
   const [missions, setMissions] = useState(initialMissions);
   const [clips, setClips] = useState(initialClips);
@@ -254,13 +282,19 @@ function AppShell({ exit }: { exit: () => void }) {
       </aside>
 
       <main className="cs2-workspace">
-        <header className="cs2-app-header"><div className="cs2-mobile-brand"><Logo /></div><span className="cs2-demo-pill">● MODE DÉMO</span><div className="cs2-header-actions"><button aria-label="Aide">?</button><div className="cs2-avatar">AV</div></div></header>
+        <header className="cs2-app-header"><div className="cs2-mobile-brand"><Logo /></div><span className="cs2-demo-pill">● MODE DÉMO</span><span className="cs2-plan-pill">✦ Plan {plan}</span><div className="cs2-header-actions"><button aria-label="Aide">?</button><div className="cs2-avatar">AV</div></div></header>
         <div className="cs2-mobile-nav">{navItems.slice(0, 5).map((item) => <button key={item.id} className={view === item.id ? "active" : ""} onClick={() => changeView(item.id)}><span>{item.icon}</span>{item.label === "Vue d’ensemble" ? "Accueil" : item.label}</button>)}</div>
 
         <section className="cs2-page">
           {view === "overview" && <>
             <div className="cs2-page-title"><div><span>MARDI 18 AOÛT</span><h1>Bonjour, Aron</h1><p>Voici ce qui demande votre attention aujourd’hui.</p></div><button className="cs2-button" onClick={() => setShowCreate(true)}>+ Nouvelle mission</button></div>
-            <div className="cs2-kpis"><article><span>À valider</span><strong>7</strong><small>clips en attente</small></article><article><span>En production</span><strong>18</strong><small>clips en cours</small></article><article><span>À publier</span><strong>4</strong><small>clips approuvés</small></article><article><span>Missions actives</span><strong>{missions.length}</strong><small>dont 1 urgente</small></article></div>
+            <div className="cs2-kpis"><article><span>À valider</span><strong><AnimatedNumber value={7} /></strong><small>clips en attente</small></article><article><span>En production</span><strong><AnimatedNumber value={18} /></strong><small>clips en cours</small></article><article><span>À publier</span><strong><AnimatedNumber value={4} /></strong><small>clips approuvés</small></article><article><span>Missions actives</span><strong><AnimatedNumber value={missions.length} /></strong><small>dont 1 urgente</small></article></div>
+            <section className="cs2-paid-dashboard" aria-label="Performances du compte abonné">
+              <div className="cs2-paid-dashboard-head"><div><span>PERFORMANCES · 7 DERNIERS JOURS</span><h2>Vos contenus accélèrent.</h2><p>Les statistiques avancées sont accessibles avec votre abonnement {plan}.</p></div><div className="cs2-live-badge"><i /> Données synchronisées</div></div>
+              <div className="cs2-growth-kpis"><article><span>Vues cumulées</span><strong><AnimatedNumber value={38200} /></strong><small>↗ 24,8% cette semaine</small></article><article><span>Taux d’engagement</span><strong><AnimatedNumber value={8} suffix=",4%" /></strong><small>↗ 1,2 point</small></article><article><span>Abonnés gagnés</span><strong>+<AnimatedNumber value={1284} /></strong><small>↗ 18,6% cette semaine</small></article></div>
+              <div className="cs2-chart-card"><header><div><b>Évolution des vues</b><span>Instagram · TikTok · YouTube · Facebook</span></div><strong>+25%</strong></header><PerformanceChart /></div>
+              <div className="cs2-channel-performance">{[["instagram",42],["tiktok",31],["youtube",18],["facebook",9]].map(([id, share]) => { const network = socialPlatforms.find((item) => item.id === id)!; return <article key={String(id)}><SocialIcon platform={network}/><div><b>{network.name}</b><span><i style={{width:`${share}%`}}/></span></div><strong>{share}%</strong></article>; })}</div>
+            </section>
             <div className="cs2-grid-2">
               <article className="cs2-panel"><div className="cs2-panel-head"><div><h2>Priorités du jour</h2><p>Commencez par ces actions.</p></div><span>2 actions</span></div><button className="cs2-priority" onClick={() => changeView("clips")}><i className="violet" /><div><b>Valider 7 clips</b><span>Nova Studio · Podcast Fondateurs #12</span></div><em>Voir les clips →</em></button><button className="cs2-priority" onClick={() => changeView("missions")}><i className="blue" /><div><b>Compléter un brief</b><span>Maison Lune · Lancement collection été</span></div><em>Voir la mission →</em></button></article>
               <article className="cs2-panel"><div className="cs2-panel-head"><div><h2>Production</h2><p>Avancement des missions actives.</p></div><button onClick={() => changeView("missions")}>Tout voir</button></div>{missions.slice(0, 3).map((mission) => <div className="cs2-progress-row" key={mission.id}><span className={`cs2-client-dot ${mission.tone}`}>{mission.client[0]}</span><div><b>{mission.title}</b><small>{mission.client}</small></div><div className="cs2-progress"><i style={{ width: `${Math.max(10, Number(mission.clips.split("/")[0]) / Number(mission.clips.split("/")[1]) * 100)}%` }} /></div><strong>{mission.clips}</strong></div>)}</article>
@@ -362,6 +396,7 @@ function AppShell({ exit }: { exit: () => void }) {
 
           {view === "settings" && <>
             <div className="cs2-page-title"><div><span>ESPACE</span><h1>Réglages</h1><p>Configurez les informations principales de votre agence.</p></div></div>
+            <div className="cs2-subscription-card"><div><span>ABONNEMENT ACTIF · DÉMONSTRATION</span><h2>Plan {plan}</h2><p>Statistiques avancées, publication multicanale et analyse virale incluses.</p></div><div><b>{plans.find((item) => item.name === plan)?.price ?? 79}€ <small>/ mois HT</small></b><button onClick={exit}>Comparer les offres</button></div></div>
             <div className="cs2-panel cs2-settings"><h2>Informations de l’agence</h2><label>Nom de l’espace<input defaultValue="ClipScale Studio" /></label><label>Email de contact<input type="email" defaultValue="bonjour@clipscale.app" /></label><label>Fuseau horaire<select defaultValue="Europe/Paris"><option>Europe/Paris</option><option>America/New_York</option></select></label><button className="cs2-button" onClick={() => notify("Réglages enregistrés dans la démo")}>Enregistrer</button></div>
           </>}
         </section>
@@ -376,5 +411,7 @@ function AppShell({ exit }: { exit: () => void }) {
 
 export default function Home() {
   const [inApp, setInApp] = useState(false);
-  return inApp ? <AppShell exit={() => setInApp(false)} /> : <Landing launch={() => setInApp(true)} />;
+  const [selectedPlan, setSelectedPlan] = useState("Scale");
+  const launch = (plan = "Scale") => { setSelectedPlan(plan); setInApp(true); };
+  return inApp ? <AppShell exit={() => setInApp(false)} plan={selectedPlan} /> : <Landing launch={launch} />;
 }
