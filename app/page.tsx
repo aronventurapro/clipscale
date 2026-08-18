@@ -8,7 +8,7 @@ import "./clipscale-v2.css";
 type View = "overview" | "missions" | "clips" | "virality" | "scripts" | "publish" | "team" | "admin" | "settings";
 type MissionStatus = "En production" | "À valider" | "Planifiée";
 type VideoMeta = { name: string; duration: number; width: number; height: number; size: number };
-type ViralAnalysis = { score: number; verdict: string; summary: string; factors: { label: string; score: number; detail: string }[]; improvements: string[] };
+type ViralAnalysis = { score: number; verdict: string; summary: string; factors: { label: string; score: number; detail: string }[]; improvements: string[]; strengths: string[]; retention: number; confidence: number; run: number };
 type SocialPlatform = { id: string; name: string; short: string; tone: string; format: string; ratio: string; recommendedLength: number; tips: string[] };
 
 const socialPlatforms: SocialPlatform[] = [
@@ -38,10 +38,10 @@ const initialMissions = [
 ];
 
 const initialClips = [
-  { id: 1, title: "Le déclic qui a tout changé", mission: "Podcast Fondateurs #12", format: "9:16 · 42 s", status: "À valider" },
-  { id: 2, title: "3 erreurs de recrutement", mission: "Podcast Fondateurs #12", format: "9:16 · 31 s", status: "Montage" },
-  { id: 3, title: "Pourquoi lancer en été", mission: "Lancement collection été", format: "1:1 · 24 s", status: "Approuvé" },
-  { id: 4, title: "La règle des 80/20", mission: "Lancement collection été", format: "9:16 · 37 s", status: "Publié" },
+  { id: 1, title: "Le déclic qui a tout changé", mission: "Podcast Fondateurs #12", format: "9:16 · 42 s", status: "À valider", score: 86, retention: 71, tone: "violet" },
+  { id: 2, title: "3 erreurs de recrutement", mission: "Podcast Fondateurs #12", format: "9:16 · 31 s", status: "Montage", score: 74, retention: 63, tone: "blue" },
+  { id: 3, title: "Pourquoi lancer en été", mission: "Lancement collection été", format: "1:1 · 24 s", status: "Approuvé", score: 68, retention: 57, tone: "orange" },
+  { id: 4, title: "La règle des 80/20", mission: "Lancement collection été", format: "9:16 · 37 s", status: "Publié", score: 91, retention: 79, tone: "green" },
 ];
 
 const navItems: { id: View; label: string; icon: string }[] = [
@@ -57,7 +57,7 @@ const navItems: { id: View; label: string; icon: string }[] = [
 ];
 
 function Logo() {
-  return <span className="cs2-logo"><span className="cs2-logo-mark">C</span>ClipScale</span>;
+  return <span className="cs2-logo"><img src="/clipscale-logo.webp" alt="ClipScale" /></span>;
 }
 
 function AnimatedNumber({ value, prefix = "", suffix = "", decimals = 0, duration = 1200 }: { value: number; prefix?: string; suffix?: string; decimals?: number; duration?: number }) {
@@ -285,6 +285,7 @@ function AppShell({ exit, plan, userId, signOut, theme, toggleTheme }: { exit: (
   const [platform, setPlatform] = useState("TikTok");
   const [hook, setHook] = useState("");
   const [analysis, setAnalysis] = useState<ViralAnalysis | null>(null);
+  const [analysisRun, setAnalysisRun] = useState(0);
   const [publishUrl, setPublishUrl] = useState("");
   const [publishFileName, setPublishFileName] = useState("");
   const [publishVideoMeta, setPublishVideoMeta] = useState<VideoMeta | null>(null);
@@ -353,7 +354,17 @@ function AppShell({ exit, plan, userId, signOut, theme, toggleTheme }: { exit: (
     const qualityPoints = Math.max(videoMeta.width, videoMeta.height) >= 1080 ? 18 : 10;
     const hookLength = hook.trim().length;
     const hookPoints = hookLength >= 18 && hookLength <= 90 ? 25 : hookLength > 0 ? 13 : 5;
-    const score = Math.min(96, 10 + durationPoints + formatPoints + qualityPoints + hookPoints);
+    const random = new Uint32Array(5);
+    window.crypto.getRandomValues(random);
+    const jitter = (index: number, range = 9) => Number(random[index] % (range * 2 + 1)) - range;
+    const cadenceScore = Math.max(42, Math.min(96, 72 + jitter(0, 16) + (videoMeta.duration <= 40 ? 6 : -5)));
+    const clarityScore = Math.max(38, Math.min(97, 70 + jitter(1, 15) + (hookLength >= 18 ? 8 : -10)));
+    const emotionScore = Math.max(35, Math.min(96, 67 + jitter(2, 18)));
+    const subtitleScore = Math.max(40, Math.min(98, 78 + jitter(3, 14)));
+    const baseScore = 10 + durationPoints + formatPoints + qualityPoints + hookPoints;
+    const creativeAdjustment = Math.round(((cadenceScore + clarityScore + emotionScore + subtitleScore) / 4 - 70) * .18);
+    const score = Math.max(38, Math.min(97, baseScore + creativeAdjustment + jitter(4, 4)));
+    const nextRun = analysisRun + 1;
     const improvements = [
       !vertical ? "Recadrez le clip en 9:16 plein écran pour TikTok, Reels et Shorts." : "Gardez les éléments importants dans la zone centrale pour éviter les boutons des plateformes.",
       videoMeta.duration > 40 ? "Coupez les respirations et visez 20 à 35 secondes pour améliorer la rétention." : "Ajoutez un changement visuel ou un zoom toutes les 2 à 3 secondes.",
@@ -369,9 +380,18 @@ function AppShell({ exit, plan, userId, signOut, theme, toggleTheme }: { exit: (
         { label: "Durée", score: Math.round(durationPoints / 25 * 100), detail: `${videoMeta.duration} secondes` },
         { label: "Format", score: Math.round(formatPoints / 22 * 100), detail: vertical ? "Vertical 9:16 adapté" : "Format horizontal à recadrer" },
         { label: "Qualité", score: Math.round(qualityPoints / 18 * 100), detail: `${videoMeta.width} × ${videoMeta.height} px` },
+        { label: "Rythme visuel", score: cadenceScore, detail: cadenceScore >= 78 ? "Cadence dynamique" : "Plans à resserrer" },
+        { label: "Clarté du message", score: clarityScore, detail: clarityScore >= 78 ? "Promesse facile à comprendre" : "Idée principale à simplifier" },
+        { label: "Charge émotionnelle", score: emotionScore, detail: emotionScore >= 75 ? "Tension narrative présente" : "Ajouter contraste ou surprise" },
+        { label: "Lisibilité mobile", score: subtitleScore, detail: subtitleScore >= 78 ? "Bonne lecture sur petit écran" : "Sous-titres à renforcer" },
       ],
       improvements,
+      strengths: [vertical ? "Format vertical adapté aux usages mobiles" : "Image source exploitable pour plusieurs recadrages", hookLength >= 18 ? "Accroche suffisamment précise pour créer une promesse" : "Sujet identifiable dès le début", qualityPoints >= 18 ? "Définition suffisante pour exporter en haute qualité" : "Fichier léger et rapide à traiter"],
+      retention: Math.max(24, Math.min(92, Math.round(score * .82 + jitter(1, 6)))),
+      confidence: Math.max(68, Math.min(94, 78 + Math.round((qualityPoints + hookPoints) / 7))),
+      run: nextRun,
     });
+    setAnalysisRun(nextRun);
   };
   const selectPublishVideo = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -458,9 +478,10 @@ function AppShell({ exit, plan, userId, signOut, theme, toggleTheme }: { exit: (
           </>}
 
           {view === "clips" && <>
-            <div className="cs2-page-title"><div><span>CONTENUS</span><h1>Clips</h1><p>Retrouvez les versions, validations et statuts de publication.</p></div><button className="cs2-button" onClick={() => changeView("virality")}>Analyser un clip</button></div>
+            <div className="cs2-page-title"><div><span>CONTENT OPERATING SYSTEM</span><h1>Clips</h1><p>Repérez immédiatement les contenus à fort potentiel, les erreurs à corriger et la prochaine action.</p></div><button className="cs2-button" onClick={() => changeView("virality")}>✦ Nouvelle analyse</button></div>
+            <div className="cs8-clip-summary"><article><span>Score moyen</span><strong><AnimatedNumber value={80} suffix="/100" /></strong><small>+6 points cette semaine</small></article><article><span>Rétention estimée</span><strong><AnimatedNumber value={68} suffix="%" /></strong><small>Objectif recommandé : 75 %</small></article><article><span>Prêts à publier</span><strong><AnimatedNumber value={2} suffix=" clips" /></strong><small>1 validation nécessaire</small></article><article><span>Erreur prioritaire</span><strong>Accroche</strong><small>2 vidéos à renforcer</small></article></div>
             <div className="cs2-filter-row">{["Tous", "Montage", "À valider", "Approuvé", "Publié"].map((filter) => <button className={clipFilter === filter ? "active" : ""} onClick={() => setClipFilter(filter)} key={filter}>{filter}</button>)}</div>
-            <div className="cs2-clip-grid">{filteredClips.map((clip) => <article className="cs2-clip-card" key={clip.id}><div className="cs2-video-placeholder"><span>▶</span><small>{clip.format}</small></div><div className="cs2-clip-info"><Status>{clip.status}</Status><h3>{clip.title}</h3><p>{clip.mission}</p><button onClick={() => advanceClip(clip.id)} disabled={clip.status === "Publié"}>{clip.status === "Publié" ? "Publication terminée" : "Passer à l’étape suivante →"}</button></div></article>)}</div>
+            <div className="cs2-clip-grid cs8-clip-grid">{filteredClips.map((clip,index) => <article className="cs2-clip-card cs8-clip-card" key={clip.id}><div className={`cs2-video-placeholder cs8-thumb ${clip.tone}`}><span>▶</span><div><b>{String(index + 1).padStart(2,"0")}</b><em>{clip.score >= 85 ? "TOP POTENTIEL" : clip.score >= 72 ? "À OPTIMISER" : "À RETRAVAILLER"}</em></div><small>{clip.format}</small></div><div className="cs2-clip-info"><div className="cs8-clip-top"><Status>{clip.status}</Status><span className={clip.score >= 80 ? "high" : "medium"}><b>{clip.score}</b>/100</span></div><h3>{clip.title}</h3><p>{clip.mission}</p><div className="cs8-mini-metrics"><span><small>RÉTENTION</small><b>{clip.retention}%</b><i><em style={{width:`${clip.retention}%`}} /></i></span><span><small>PRIORITÉ</small><b>{clip.score >= 85 ? "Publier" : clip.score >= 72 ? "Hook" : "Recadrage"}</b></span></div><div className="cs8-card-actions"><button onClick={() => { setHook(clip.title); setPlatform("TikTok"); changeView("virality"); }}>Analyser en détail</button><button onClick={() => advanceClip(clip.id)} disabled={clip.status === "Publié"}>{clip.status === "Publié" ? "✓ Publié" : "Étape suivante →"}</button></div></div></article>)}</div>
           </>}
 
           {view === "virality" && <>
@@ -476,9 +497,12 @@ function AppShell({ exit, plan, userId, signOut, theme, toggleTheme }: { exit: (
 
               <section className={`cs2-panel cs2-analysis-result ${analysis ? "ready" : ""}`} aria-live="polite">
                 {!analysis ? <div className="cs2-empty-analysis"><span>◎</span><h2>Votre diagnostic apparaîtra ici</h2><p>Ajoutez une vidéo et son accroche pour obtenir le score, les points forts et les améliorations prioritaires.</p></div> : <>
-                  <div className="cs2-score-header"><div className="cs2-score-ring" style={{ "--score": `${analysis.score * 3.6}deg` } as CSSProperties}><span><strong>{analysis.score}</strong><small>/100</small></span></div><div><span className="cs2-potential-label">{analysis.verdict}</span><h2>Potentiel viral estimé</h2><p>{analysis.summary}</p></div></div>
+                  <div className="cs2-score-header"><div className="cs2-score-ring" style={{ "--score": `${analysis.score * 3.6}deg` } as CSSProperties}><span><strong>{analysis.score}</strong><small>/100</small></span></div><div><span className="cs2-potential-label">{analysis.verdict} · ANALYSE #{analysis.run}</span><h2>Potentiel viral estimé</h2><p>{analysis.summary}</p></div></div>
+                  <div className="cs8-analysis-kpis"><span><small>RÉTENTION ESTIMÉE</small><strong>{analysis.retention}%</strong></span><span><small>CONFIANCE DU DIAGNOSTIC</small><strong>{analysis.confidence}%</strong></span><span><small>ERREURS DÉTECTÉES</small><strong>{analysis.improvements.length}</strong></span></div>
                   <div className="cs2-factor-list"><h3>Détail du score</h3>{analysis.factors.map((factor) => <div className="cs2-factor" key={factor.label}><div><b>{factor.label}</b><span>{factor.detail}</span><strong>{factor.score}%</strong></div><div><i style={{ width: `${factor.score}%` }} /></div></div>)}</div>
+                  <div className="cs8-strengths"><h3>Ce qui fonctionne déjà</h3>{analysis.strengths.map((item) => <p key={item}><span>✓</span>{item}</p>)}</div>
                   <div className="cs2-improvements"><h3>Comment l’améliorer</h3>{analysis.improvements.map((item, index) => <article key={item}><b>{index + 1}</b><p>{item}</p></article>)}</div>
+                  <button className="cs2-secondary-action cs8-rerun" onClick={analyzeVideo}>↻ Relancer une analyse différente</button>
                   <button className="cs2-secondary-action" onClick={() => { setAnalysis(null); setHook(""); }}>Analyser une autre version</button>
                 </>}
               </section>
