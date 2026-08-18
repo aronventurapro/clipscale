@@ -10,7 +10,11 @@ export const metadata: Metadata = {
   keywords:["agence de clipping","logiciel clipping","SaaS clipping","clips TikTok","YouTube Shorts","Instagram Reels"],
   openGraph:{title:"ClipScale — Le cockpit des agences de clipping",description:"Du format long à une campagne de clips pilotée dans un seul espace.",type:"website",locale:"fr_FR"},
   robots:{index:true,follow:true},
+  manifest:"/manifest.webmanifest",
+  icons:{icon:"/icon.svg",apple:"/icon.svg"},
+  appleWebApp:{capable:true,statusBarStyle:"black-translucent",title:"ClipScale"},
   other: {
+    "theme-color":"#090b12",
     "codex-preview": "development",
   },
 };

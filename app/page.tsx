@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, type ChangeEvent, type CSSProperties, type KeyboardEvent } from "react";
 import { SiBluesky, SiFacebook, SiInstagram, SiLinkedin, SiPinterest, SiSnapchat, SiTelegram, SiThreads, SiTiktok, SiYoutube } from "react-icons/si";
+import { supabase } from "../lib/supabase";
 import "./clipscale-v2.css";
 
 type View = "overview" | "missions" | "clips" | "virality" | "publish" | "team" | "settings";
@@ -83,8 +84,9 @@ const plans = [
   { name: "Agency", price: 149, description: "Pour piloter plusieurs clients depuis un seul cockpit.", features: ["10 membres inclus", "Clips illimités", "Espaces clients", "Publication prioritaire", "Support dédié"], cta: "Passer à Agency" },
 ];
 
-function Landing({ launch }: { launch: (plan?: string) => void }) {
+function Landing({ launch }: { launch: (plan?: string, requireAccount?: boolean) => void }) {
   const [spotlight, setSpotlight] = useState<"analyse" | "publication" | "pilotage">("analyse");
+  const [openFaq, setOpenFaq] = useState(0);
   const spotlightTabs = ["analyse", "publication", "pilotage"] as const;
   const navigateSpotlight = (event: KeyboardEvent<HTMLButtonElement>, current: typeof spotlightTabs[number]) => {
     const currentIndex = spotlightTabs.indexOf(current);
@@ -102,7 +104,7 @@ function Landing({ launch }: { launch: (plan?: string) => void }) {
       <header className="cs3-header">
         <a href="#top" aria-label="Accueil ClipScale"><Logo /></a>
         <nav aria-label="Navigation principale"><a href="#product">Produit</a><a href="#workflow">Fonctionnement</a><a href="#features">Fonctionnalités</a><a href="#pricing">Tarifs</a></nav>
-        <button type="button" className="cs3-nav-cta" onClick={() => launch()}>Voir la démo <span aria-hidden="true">↗</span></button>
+        <button type="button" className="cs3-nav-cta" onClick={() => launch("Scale", true)}>Se connecter <span aria-hidden="true">↗</span></button>
       </header>
 
       <section className="cs3-hero" id="main-content">
@@ -149,9 +151,17 @@ function Landing({ launch }: { launch: (plan?: string) => void }) {
 
       <section className="cs3-bento"><article className="cs3-bento-large"><span>POUR LES AGENCES</span><h2>Plus de capacité.<br />Moins de coordination.</h2><p>Votre équipe voit ses priorités. Vos clients voient l’avancement. Vous gardez la maîtrise.</p><div><b><strong>1</strong><small>cockpit</small></b><b><strong>10</strong><small>réseaux</small></b><b><strong>0</strong><small>tableur</small></b></div></article><article className="cs3-bento-dark"><span>VIRALITÉ</span><div className="cs3-mini-ring">87</div><h3>Comprenez avant de publier.</h3><p>Accroche, format, durée et qualité expliqués clairement.</p></article><article className="cs3-bento-purple"><span>DIFFUSION</span><div className="cs3-bento-icons">{socialPlatforms.slice(0, 4).map((item) => <SocialIcon platform={item} key={item.id} />)}</div><h3>Publiez sans vous répéter.</h3><p>Une préparation unique pour tous vos canaux.</p></article></section>
 
-      <section className="cs3-pricing" id="pricing"><div className="cs3-section-tag">DES OFFRES QUI ÉVOLUENT AVEC VOUS</div><div className="cs3-pricing-head"><h2>Commencez simplement.<br /><em>Passez à l’échelle.</em></h2><p>Chaque formule inclut le cockpit de production, l’analyse virale et la préparation multicanale.</p></div><div className="cs3-pricing-grid">{plans.map((plan) => <article key={plan.name} className={plan.popular ? "popular" : ""}>{plan.popular && <span className="cs3-popular-label">LE PLUS CHOISI</span>}<header><span>{plan.name}</span><p>{plan.description}</p></header><div className="cs3-price"><strong>{plan.price}€</strong><small>/ mois<br />HT</small></div><ul>{plan.features.map((feature) => <li key={feature}><i>✓</i>{feature}</li>)}</ul><button type="button" onClick={() => launch(plan.name)}>{plan.cta}<span>→</span></button><small>Sans engagement · Annulation à tout moment</small></article>)}</div><p className="cs3-pricing-note">Le paiement sécurisé sera activé via Stripe. Les boutons ouvrent actuellement la démonstration du plan choisi.</p></section>
+      <section className="cs3-video-demo"><div><div className="cs3-section-tag">30 SECONDES POUR TOUT COMPRENDRE</div><h2>Voyez le workflow<br /><em>avant de commencer.</em></h2><p>De l’import du clip à la préparation multicanale, cette démonstration présente le parcours complet de ClipScale.</p><button type="button" onClick={() => launch()}>Essayer le parcours vous-même →</button></div><div className="cs3-video-frame"><video controls muted playsInline preload="metadata"><source src="/clipscale-demo.mp4" type="video/mp4" /></video><span>00:30 · DÉMO PRODUIT</span></div></section>
 
-      <section className="cs3-final"><div className="cs3-final-orb" /><span>PRÊT À SIMPLIFIER VOTRE PRODUCTION ?</span><h2>Votre prochaine vidéo mérite<br /><em>mieux qu’un tableur.</em></h2><p>Testez le parcours complet : pilotage, analyse virale et préparation multicanale.</p><button type="button" className="cs3-primary" onClick={() => launch()}>Tester ClipScale maintenant <b aria-hidden="true">→</b></button><small>Accès immédiat · Aucun paiement · Données fictives</small></section>
+      <section className="cs3-results"><div className="cs3-section-tag">RÉSULTATS ATTENDUS</div><h2>Moins d’opérations.<br />Plus de contenu publié.</h2><div className="cs3-results-grid">{[["-68%","de temps consacré à la diffusion","Scénario agence · 5 clients"],["×3","plus de variantes publiées","Scénario créateur · 4 réseaux"],["+24%","de vues hebdomadaires","Projection issue du tableau de bord démo"]].map(([value,label,note]) => <article key={value}><strong>{value}</strong><p>{label}</p><small>{note}</small></article>)}</div><p className="cs3-results-disclaimer">Ces chiffres illustrent des scénarios de démonstration. Les résultats réels dépendent du contenu, de l’audience et des plateformes.</p></section>
+
+      <section className="cs3-comparison"><div className="cs3-section-tag">COMPARER LES OFFRES</div><h2>Le bon niveau de puissance,<br />sans payer pour le reste.</h2><div className="cs3-comparison-table" role="table" aria-label="Comparaison des offres ClipScale"><div className="head" role="row"><span role="columnheader">Fonctionnalité</span>{plans.map((plan) => <b role="columnheader" key={plan.name}>{plan.name}<small>{plan.price}€/mois</small></b>)}</div>{[["Clips par mois","30","150","Illimités"],["Réseaux connectés","4","10","10"],["Membres inclus","1","3","10"],["Analyse virale","✓","✓","✓"],["Variantes par réseau","—","✓","✓"],["Espaces clients","—","—","✓"],["Support","Email","Prioritaire","Dédié"]].map((row) => <div role="row" key={row[0]}><span role="cell">{row[0]}</span>{row.slice(1).map((cell,index) => <b role="cell" key={`${row[0]}-${index}`}>{cell}</b>)}</div>)}</div></section>
+
+      <section className="cs3-pricing" id="pricing"><div className="cs3-section-tag">DES OFFRES QUI ÉVOLUENT AVEC VOUS</div><div className="cs3-pricing-head"><h2>Commencez simplement.<br /><em>Passez à l’échelle.</em></h2><p>Chaque formule inclut le cockpit de production, l’analyse virale et la préparation multicanale.</p></div><div className="cs3-pricing-grid">{plans.map((plan) => <article key={plan.name} className={plan.popular ? "popular" : ""}>{plan.popular && <span className="cs3-popular-label">LE PLUS CHOISI</span>}<header><span>{plan.name}</span><p>{plan.description}</p></header><div className="cs3-price"><strong>{plan.price}€</strong><small>/ mois<br />HT</small></div><ul>{plan.features.map((feature) => <li key={feature}><i>✓</i>{feature}</li>)}</ul><button type="button" onClick={() => launch(plan.name, true)}>{plan.cta}<span>→</span></button><small>Sans engagement · Annulation à tout moment</small></article>)}</div><p className="cs3-pricing-note">Le paiement sécurisé sera activé via Stripe. Créez votre compte pour préparer votre espace dès maintenant.</p></section>
+
+      <section className="cs3-faq"><div><div className="cs3-section-tag">QUESTIONS FRÉQUENTES</div><h2>Tout ce qu’il faut savoir<br />avant de démarrer.</h2><p>Une question qui manque ? Le support est disponible directement dans l’application.</p></div><div className="cs3-faq-list">{[["ClipScale publie-t-il réellement sur mes réseaux ?","La connexion officielle de chaque plateforme sera nécessaire. ClipScale prépare déjà les variantes et le calendrier ; l’envoi réel sera activé réseau par réseau après validation OAuth."],["Mes vidéos sont-elles sécurisées ?","Oui. Le stockage est privé et chaque fichier est isolé par utilisateur. Les autres clients ne peuvent pas accéder à vos vidéos."],["Puis-je essayer sans payer ?","Oui. Votre espace démarre avec 14 jours d’essai. Stripe sera connecté à la dernière étape avant l’ouverture des abonnements payants."],["Le score viral garantit-il des vues ?","Non. Il s’agit d’une estimation qui aide à améliorer le format, l’accroche et la rétention. Aucun outil ne peut garantir la viralité."],["Puis-je gérer plusieurs clients ?","Oui, l’offre Agency prévoit plusieurs membres, des espaces clients et un suivi centralisé des validations."]].map(([question,answer],index) => <article className={openFaq === index ? "open" : ""} key={question}><button type="button" aria-expanded={openFaq === index} onClick={() => setOpenFaq(openFaq === index ? -1 : index)}><span>{question}</span><b>{openFaq === index ? "−" : "+"}</b></button>{openFaq === index && <p>{answer}</p>}</article>)}</div></section>
+
+      <section className="cs3-final"><div className="cs3-final-orb" /><span>PRÊT À SIMPLIFIER VOTRE PRODUCTION ?</span><h2>Votre prochaine vidéo mérite<br /><em>mieux qu’un tableur.</em></h2><p>Créez votre espace puis suivez le parcours guidé jusqu’à votre première publication.</p><button type="button" className="cs3-primary" onClick={() => launch("Scale", true)}>Créer mon espace ClipScale <b aria-hidden="true">→</b></button><small>14 jours d’essai · Aucun paiement maintenant</small></section>
       <footer className="cs3-footer"><Logo /><p>Le cockpit de croissance des agences de clipping.</p><div><a href="/mentions-legales">Mentions légales</a><a href="/confidentialite">Confidentialité</a><span>© 2026 ClipScale</span></div></footer>
     </main>
   );
@@ -162,7 +172,54 @@ function Status({ children }: { children: string }) {
   return <span className={`cs2-status ${slug}`}>{children}</span>;
 }
 
-function AppShell({ exit, plan }: { exit: () => void; plan: string }) {
+function AuthModal({ plan, close, authenticated }: { plan: string; close: () => void; authenticated: (userId: string) => void }) {
+  const [mode, setMode] = useState<"signup" | "signin" | "reset">("signup");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [workspaceName, setWorkspaceName] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [feedback, setFeedback] = useState("");
+  const submit = async () => {
+    setFeedback(""); setLoading(true);
+    if (mode === "reset") {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin });
+      setFeedback(error ? error.message : "Email de réinitialisation envoyé."); setLoading(false); return;
+    }
+    if (mode === "signup") {
+      const { data, error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: window.location.origin, data: { full_name: fullName, workspace_name: workspaceName || "Mon espace ClipScale" } } });
+      if (error) setFeedback(error.message);
+      else if (data.session && data.user) authenticated(data.user.id);
+      else setFeedback("Compte créé. Vérifiez votre boîte email pour confirmer votre adresse.");
+    } else {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) setFeedback(error.message); else if (data.user) authenticated(data.user.id);
+    }
+    setLoading(false);
+  };
+  return <div className="cs2-modal-backdrop cs4-auth-backdrop" role="presentation" onMouseDown={(event) => event.currentTarget === event.target && close()}><div className="cs4-auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-title"><button className="cs2-modal-close" onClick={close} aria-label="Fermer">×</button><Logo/><span>{mode === "signup" ? `ESSAI ${plan} · 14 JOURS` : mode === "signin" ? "BON RETOUR" : "ACCÈS AU COMPTE"}</span><h2 id="auth-title">{mode === "signup" ? "Créez votre cockpit." : mode === "signin" ? "Connectez-vous à ClipScale." : "Réinitialisez votre accès."}</h2><p>{mode === "signup" ? "Aucun paiement maintenant. Votre espace sécurisé est créé immédiatement." : "Retrouvez vos vidéos, publications et statistiques."}</p>{mode === "signup" && <div className="cs4-auth-row"><label>Votre nom<input value={fullName} onChange={(e) => setFullName(e.target.value)} autoComplete="name" placeholder="Arno Ventura" /></label><label>Nom de l’espace<input value={workspaceName} onChange={(e) => setWorkspaceName(e.target.value)} placeholder="Mon agence" /></label></div>}<label>Email professionnel<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" placeholder="vous@entreprise.com" /></label>{mode !== "reset" && <label>Mot de passe<input type="password" minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={mode === "signup" ? "new-password" : "current-password"} placeholder="8 caractères minimum" /></label>}<button className="cs2-button cs4-auth-submit" onClick={submit} disabled={loading || !email || (mode !== "reset" && password.length < 8)}>{loading ? "Un instant…" : mode === "signup" ? "Créer mon espace →" : mode === "signin" ? "Se connecter →" : "Envoyer le lien →"}</button>{feedback && <div className="cs4-auth-feedback" role="status">{feedback}</div>}<div className="cs4-auth-switch">{mode === "signup" ? <button onClick={() => setMode("signin")}>Déjà inscrit ? Se connecter</button> : <button onClick={() => setMode("signup")}>Créer un compte</button>}{mode === "signin" && <button onClick={() => setMode("reset")}>Mot de passe oublié ?</button>}</div><small>En continuant, vous acceptez les conditions et la politique de confidentialité.</small></div></div>;
+}
+
+function Onboarding({ userId, plan, done }: { userId: string; plan: string; done: () => void }) {
+  const [step, setStep] = useState(1);
+  const [workspace, setWorkspace] = useState("Mon espace ClipScale");
+  const [role, setRole] = useState("Agence");
+  const [teamSize, setTeamSize] = useState("1 à 3 personnes");
+  const [goal, setGoal] = useState("Publier plus vite");
+  const [saving, setSaving] = useState(false);
+  const finish = async () => {
+    setSaving(true);
+    const [profileResult, workspaceResult] = await Promise.all([
+      supabase.from("profiles").update({ onboarding_step: 5, onboarding_complete: true, role_type: role, team_size: teamSize, primary_goal: goal }).eq("id", userId),
+      supabase.from("workspaces").update({ name: workspace }).eq("owner_id", userId),
+    ]);
+    setSaving(false);
+    if (!profileResult.error && !workspaceResult.error) done();
+  };
+  return <div className="cs4-onboarding"><header><Logo/><span>Étape {step} sur 4</span></header><div className="cs4-onboarding-progress"><i style={{width:`${step * 25}%`}}/></div><main>{step === 1 && <><span>BIENVENUE SUR CLIPSCALE</span><h1>Configurons votre espace.</h1><p>Quelques réponses suffisent pour personnaliser votre cockpit.</p><label>Nom de votre espace<input value={workspace} onChange={(e) => setWorkspace(e.target.value)} /></label></>}{step === 2 && <><span>VOTRE ACTIVITÉ</span><h1>Quel est votre profil ?</h1><p>Nous adapterons les priorités et les recommandations.</p><div className="cs4-choice-grid">{["Agence","Créateur","Freelance","Équipe marketing"].map((item) => <button className={role === item ? "active" : ""} onClick={() => setRole(item)} key={item}>{item}</button>)}</div></>}{step === 3 && <><span>VOTRE ÉQUIPE</span><h1>Combien êtes-vous ?</h1><p>Vous pourrez inviter les autres membres plus tard.</p><div className="cs4-choice-grid">{["Je travaille seul","1 à 3 personnes","4 à 10 personnes","Plus de 10"].map((item) => <button className={teamSize === item ? "active" : ""} onClick={() => setTeamSize(item)} key={item}>{item}</button>)}</div></>}{step === 4 && <><span>OBJECTIF PRINCIPAL</span><h1>Que voulez-vous améliorer ?</h1><p>Votre plan {plan} sera préparé autour de cet objectif.</p><div className="cs4-choice-grid">{["Publier plus vite","Améliorer la viralité","Gérer mes clients","Suivre les performances"].map((item) => <button className={goal === item ? "active" : ""} onClick={() => setGoal(item)} key={item}>{item}</button>)}</div></>}</main><footer>{step > 1 ? <button onClick={() => setStep(step - 1)}>← Retour</button> : <span/>}<button className="cs2-button" onClick={() => step < 4 ? setStep(step + 1) : finish()} disabled={saving || (step === 1 && !workspace.trim())}>{saving ? "Création…" : step < 4 ? "Continuer →" : "Ouvrir mon cockpit →"}</button></footer></div>;
+}
+
+function AppShell({ exit, plan, userId, signOut }: { exit: () => void; plan: string; userId: string | null; signOut: () => void }) {
   const [view, setView] = useState<View>("overview");
   const [missions, setMissions] = useState(initialMissions);
   const [clips, setClips] = useState(initialClips);
@@ -186,6 +243,10 @@ function AppShell({ exit, plan }: { exit: () => void; plan: string }) {
   const [publishMode, setPublishMode] = useState<"now" | "schedule">("now");
   const [scheduledAt, setScheduledAt] = useState("");
   const [showConnect, setShowConnect] = useState(false);
+  const [showSupport, setShowSupport] = useState(false);
+  const [supportSubject, setSupportSubject] = useState("");
+  const [supportMessage, setSupportMessage] = useState("");
+  const [supportSending, setSupportSending] = useState(false);
   const filteredClips = useMemo(() => clipFilter === "Tous" ? clips : clips.filter((clip) => clip.status === clipFilter), [clips, clipFilter]);
   const notify = (message: string) => { setToast(message); window.setTimeout(() => setToast(""), 2600); };
   const changeView = (next: View) => { setView(next); setShowCreate(false); };
@@ -272,6 +333,14 @@ function AppShell({ exit, plan }: { exit: () => void; plan: string }) {
   const activePlatform = socialPlatforms.find((item) => item.id === activeCustomize) ?? socialPlatforms[0];
   const allCopiesReady = selectedPlatforms.length > 0 && selectedPlatforms.every((id) => adaptedPlatforms.includes(id) && platformCopies[id]?.trim());
   const publishReady = Boolean(publishUrl && publishCaption.trim() && allCopiesReady && (!selectedPlatforms.includes("youtube") || youtubeTitle.trim()) && (publishMode === "now" || scheduledAt));
+  const sendSupportTicket = async () => {
+    if (!userId || !supportSubject.trim() || !supportMessage.trim()) return;
+    setSupportSending(true);
+    const { data: membership } = await supabase.from("workspace_members").select("workspace_id").eq("user_id", userId).limit(1).maybeSingle();
+    const { error } = membership ? await supabase.from("support_tickets").insert({ workspace_id: membership.workspace_id, user_id: userId, subject: supportSubject.trim(), message: supportMessage.trim() }) : { error: new Error("Espace introuvable") };
+    setSupportSending(false);
+    if (error) notify("Impossible d’envoyer la demande pour le moment"); else { setShowSupport(false); setSupportSubject(""); setSupportMessage(""); notify("Demande envoyée au support"); }
+  };
 
   return (
     <div className="cs2-app">
@@ -396,14 +465,17 @@ function AppShell({ exit, plan }: { exit: () => void; plan: string }) {
 
           {view === "settings" && <>
             <div className="cs2-page-title"><div><span>ESPACE</span><h1>Réglages</h1><p>Configurez les informations principales de votre agence.</p></div></div>
-            <div className="cs2-subscription-card"><div><span>ABONNEMENT ACTIF · DÉMONSTRATION</span><h2>Plan {plan}</h2><p>Statistiques avancées, publication multicanale et analyse virale incluses.</p></div><div><b>{plans.find((item) => item.name === plan)?.price ?? 79}€ <small>/ mois HT</small></b><button onClick={exit}>Comparer les offres</button></div></div>
+            <div className="cs2-subscription-card"><div><span>{userId ? "ESSAI ACTIF · 14 JOURS" : "ABONNEMENT · DÉMONSTRATION"}</span><h2>Plan {plan}</h2><p>Statistiques avancées, publication multicanale et analyse virale incluses.</p></div><div><b>{plans.find((item) => item.name === plan)?.price ?? 79}€ <small>/ mois HT</small></b><button onClick={exit}>Comparer les offres</button></div></div>
             <div className="cs2-panel cs2-settings"><h2>Informations de l’agence</h2><label>Nom de l’espace<input defaultValue="ClipScale Studio" /></label><label>Email de contact<input type="email" defaultValue="bonjour@clipscale.app" /></label><label>Fuseau horaire<select defaultValue="Europe/Paris"><option>Europe/Paris</option><option>America/New_York</option></select></label><button className="cs2-button" onClick={() => notify("Réglages enregistrés dans la démo")}>Enregistrer</button></div>
+            {userId && <button className="cs4-signout" onClick={signOut}>Se déconnecter</button>}
           </>}
         </section>
       </main>
 
       {showCreate && <div className="cs2-modal-backdrop" role="presentation" onMouseDown={(event) => event.currentTarget === event.target && setShowCreate(false)}><div className="cs2-modal" role="dialog" aria-modal="true" aria-labelledby="new-mission-title"><button className="cs2-modal-close" onClick={() => setShowCreate(false)} aria-label="Fermer">×</button><span>NOUVELLE MISSION</span><h2 id="new-mission-title">Que faut-il produire ?</h2><p>Créez la structure de la mission. Vous pourrez compléter le brief ensuite.</p><label>Nom de la mission<input autoFocus placeholder="Ex. Podcast Fondateurs #13" /></label><div className="cs2-form-row"><label>Client<input placeholder="Nom du client" /></label><label>Nombre de clips<input type="number" min="1" defaultValue="6" /></label></div><label>Échéance<input type="date" /></label><div className="cs2-modal-actions"><button onClick={() => setShowCreate(false)}>Annuler</button><button className="cs2-button" onClick={addMission}>Créer la mission</button></div></div></div>}
       {showConnect && <div className="cs2-modal-backdrop" role="presentation" onMouseDown={(event) => event.currentTarget === event.target && setShowConnect(false)}><div className="cs2-modal cs2-connect-modal" role="dialog" aria-modal="true" aria-labelledby="connect-title"><button className="cs2-modal-close" onClick={() => setShowConnect(false)} aria-label="Fermer">×</button><span>DERNIÈRE ÉTAPE</span><h2 id="connect-title">Connectez vos comptes</h2><p>La publication est prête. Pour envoyer réellement la vidéo, autorisez chaque réseau avec sa fenêtre officielle.</p><div className="cs2-connect-list">{socialPlatforms.filter((item) => selectedPlatforms.includes(item.id)).map((item) => <div key={item.id}><SocialIcon platform={item} /><b>{item.name}</b><small>À connecter</small></div>)}</div><div className="cs2-connect-security"><span>✓</span><p><b>Connexion OAuth sécurisée</b><br />Vos identifiants restent chez Instagram, TikTok, Google, Meta et les autres plateformes.</p></div><div className="cs2-modal-actions"><button onClick={() => setShowConnect(false)}>Revenir au brouillon</button><button className="cs2-button" onClick={() => notify("Intégration des comptes prête à être configurée")}>Configurer les connexions</button></div></div></div>}
+      <button className="cs4-support-fab" onClick={() => setShowSupport(true)} aria-label="Ouvrir le support"><span>?</span><b>Support</b></button>
+      {showSupport && <div className="cs2-modal-backdrop" role="presentation" onMouseDown={(event) => event.currentTarget === event.target && setShowSupport(false)}><div className="cs2-modal cs4-support-modal" role="dialog" aria-modal="true" aria-labelledby="support-title"><button className="cs2-modal-close" onClick={() => setShowSupport(false)} aria-label="Fermer">×</button><span>SUPPORT CLIPSCALE</span><h2 id="support-title">Comment peut-on vous aider ?</h2><p>{userId ? "Votre demande sera enregistrée dans votre espace." : "Connectez-vous pour envoyer une demande suivie à notre équipe."}</p><label>Sujet<input value={supportSubject} onChange={(e) => setSupportSubject(e.target.value)} placeholder="Ex. Connexion Instagram" /></label><label>Votre message<textarea value={supportMessage} onChange={(e) => setSupportMessage(e.target.value)} placeholder="Décrivez précisément votre question…" /></label><div className="cs4-support-options"><button onClick={() => notify("Centre d’aide bientôt disponible")}>⌕ Centre d’aide</button><button onClick={() => notify("Email : support@clipscale.app")}>✉ Nous écrire</button></div><button className="cs2-button" disabled={!userId || supportSending || !supportSubject.trim() || !supportMessage.trim()} onClick={sendSupportTicket}>{supportSending ? "Envoi…" : userId ? "Envoyer la demande →" : "Connectez-vous pour envoyer"}</button></div></div>}
       {toast && <div className="cs2-toast" role="status">✓ {toast}</div>}
     </div>
   );
@@ -412,6 +484,24 @@ function AppShell({ exit, plan }: { exit: () => void; plan: string }) {
 export default function Home() {
   const [inApp, setInApp] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState("Scale");
-  const launch = (plan = "Scale") => { setSelectedPlan(plan); setInApp(true); };
-  return inApp ? <AppShell exit={() => setInApp(false)} plan={selectedPlan} /> : <Landing launch={launch} />;
+  const [userId, setUserId] = useState<string | null>(null);
+  const [showAuth, setShowAuth] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setUserId(data.session?.user.id ?? null));
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => setUserId(session?.user.id ?? null));
+    return () => data.subscription.unsubscribe();
+  }, []);
+  const openAuthenticatedApp = async (id: string) => {
+    setUserId(id); setShowAuth(false);
+    const { data } = await supabase.from("profiles").select("onboarding_complete").eq("id", id).maybeSingle();
+    if (data?.onboarding_complete) setInApp(true); else setShowOnboarding(true);
+  };
+  const launch = async (plan = "Scale", requireAccount = false) => {
+    setSelectedPlan(plan);
+    if (!requireAccount) { setInApp(true); return; }
+    if (userId) await openAuthenticatedApp(userId); else setShowAuth(true);
+  };
+  const signOut = async () => { await supabase.auth.signOut(); setUserId(null); setInApp(false); };
+  return <>{showOnboarding && userId ? <Onboarding userId={userId} plan={selectedPlan} done={() => { setShowOnboarding(false); setInApp(true); }} /> : inApp ? <AppShell exit={() => setInApp(false)} plan={selectedPlan} userId={userId} signOut={signOut} /> : <Landing launch={launch} />}{showAuth && <AuthModal plan={selectedPlan} close={() => setShowAuth(false)} authenticated={openAuthenticatedApp} />}</>;
 }
