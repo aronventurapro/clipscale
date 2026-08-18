@@ -9,6 +9,7 @@ type View = "overview" | "missions" | "clips" | "virality" | "scripts" | "publis
 type MissionStatus = "En production" | "À valider" | "Planifiée";
 type VideoMeta = { name: string; duration: number; width: number; height: number; size: number };
 type ViralAnalysis = { score: number; verdict: string; summary: string; factors: { label: string; score: number; detail: string }[]; improvements: string[]; strengths: string[]; retention: number; confidence: number; run: number };
+type AccessGrant = { id: string; email: string; active: boolean; access_level: "starter" | "scale" | "agency"; note: string | null; created_at: string };
 type SocialPlatform = { id: string; name: string; short: string; tone: string; format: string; ratio: string; recommendedLength: number; tips: string[] };
 
 const socialPlatforms: SocialPlatform[] = [
@@ -57,7 +58,7 @@ const navItems: { id: View; label: string; icon: string }[] = [
 ];
 
 function Logo() {
-  return <span className="cs2-logo"><img src="/clipscale-logo.webp" alt="ClipScale" /></span>;
+  return <span className="cs2-logo"><img src="/clipscale-mark.webp" alt="" aria-hidden="true" /><strong><b>CLIP</b>SCALE</strong></span>;
 }
 
 function AnimatedNumber({ value, prefix = "", suffix = "", decimals = 0, duration = 1200 }: { value: number; prefix?: string; suffix?: string; decimals?: number; duration?: number }) {
@@ -312,8 +313,44 @@ function AppShell({ exit, plan, userId, signOut, theme, toggleTheme }: { exit: (
   const [scriptReferences, setScriptReferences] = useState("Yomi Denzel, Ali Abdaal, chaîne Think Media");
   const [scriptKeywords, setScriptKeywords] = useState("clipping vidéo, contenu court, automatisation, créateur");
   const [generatedScript, setGeneratedScript] = useState<null | { title: string; hook: string; body: string[]; description: string; seoTitle: string; tags: string[] }>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [complimentaryAccess, setComplimentaryAccess] = useState<AccessGrant | null>(null);
+  const [accessGrants, setAccessGrants] = useState<AccessGrant[]>([]);
+  const [grantEmail, setGrantEmail] = useState("");
+  const [grantNote, setGrantNote] = useState("");
+  const [grantSaving, setGrantSaving] = useState(false);
   const filteredClips = useMemo(() => clipFilter === "Tous" ? clips : clips.filter((clip) => clip.status === clipFilter), [clips, clipFilter]);
+  const visibleNavItems = useMemo(() => navItems.filter((item) => item.id !== "admin" || isAdmin), [isAdmin]);
   const notify = (message: string) => { setToast(message); window.setTimeout(() => setToast(""), 2600); };
+  const loadAccess = async () => {
+    if (!userId) { setIsAdmin(false); setComplimentaryAccess(null); return; }
+    const [{ data: admin }, { data: grant }] = await Promise.all([
+      supabase.from("admin_users").select("email").limit(1).maybeSingle(),
+      supabase.from("access_grants").select("id,email,active,access_level,note,created_at").eq("active", true).limit(1).maybeSingle(),
+    ]);
+    const adminMode = Boolean(admin);
+    setIsAdmin(adminMode);
+    setComplimentaryAccess(grant as AccessGrant | null);
+    if (adminMode) {
+      const { data } = await supabase.from("access_grants").select("id,email,active,access_level,note,created_at").order("created_at", { ascending: false });
+      setAccessGrants((data ?? []) as AccessGrant[]);
+    }
+  };
+  useEffect(() => { void loadAccess(); }, [userId]);
+  const addAccessGrant = async () => {
+    const email = grantEmail.trim().toLowerCase();
+    if (!userId || !isAdmin || !/^\S+@\S+\.\S+$/.test(email)) { notify("Saisissez une adresse e-mail valide"); return; }
+    setGrantSaving(true);
+    const { error } = await supabase.from("access_grants").upsert({ email, active: true, access_level: "agency", note: grantNote.trim() || null, granted_by: userId }, { onConflict: "email" });
+    setGrantSaving(false);
+    if (error) { notify("Accès non enregistré — reconnectez-vous puis réessayez"); return; }
+    setGrantEmail(""); setGrantNote(""); await loadAccess(); notify("Accès Agency offert activé");
+  };
+  const toggleAccessGrant = async (grant: AccessGrant) => {
+    const { error } = await supabase.from("access_grants").update({ active: !grant.active, updated_at: new Date().toISOString() }).eq("id", grant.id);
+    if (error) { notify("Modification impossible"); return; }
+    await loadAccess(); notify(grant.active ? "Accès suspendu" : "Accès réactivé");
+  };
   const generateScript = () => {
     const mainKeyword = scriptKeywords.split(",")[0]?.trim() || scriptTopic;
     setGeneratedScript({
@@ -448,7 +485,7 @@ function AppShell({ exit, plan, userId, signOut, theme, toggleTheme }: { exit: (
     <div className="cs2-app">
       <aside className="cs2-sidebar">
         <button className="cs2-brand-button" onClick={exit} aria-label="Retour au site"><Logo /></button>
-        <nav aria-label="Navigation de l’application">{navItems.map((item) => <button key={item.id} className={view === item.id ? "active" : ""} onClick={() => changeView(item.id)}><span>{item.icon}</span>{item.label}</button>)}</nav>
+        <nav aria-label="Navigation de l’application">{visibleNavItems.map((item) => <button key={item.id} className={view === item.id ? "active" : ""} onClick={() => changeView(item.id)}><span>{item.icon}</span>{item.label}</button>)}</nav>
         <div className="cs2-demo-card"><b>Mode démo</b><p>Les données affichées sont fictives et restent dans votre navigateur.</p><button onClick={exit}>Quitter la démo</button></div>
       </aside>
 
@@ -570,7 +607,7 @@ function AppShell({ exit, plan, userId, signOut, theme, toggleTheme }: { exit: (
             <section className="cs2-panel cs7-script-output" aria-live="polite">{generatedScript ? <><div className="cs7-output-top"><span>VERSION 01 · {scriptTone.toUpperCase()}</span><button onClick={() => navigator.clipboard?.writeText([generatedScript.title,generatedScript.hook,...generatedScript.body,generatedScript.description].join("\n\n")).then(() => notify("Script copié"))}>Copier tout</button></div><article><small>TITRE DE LA VIDÉO</small><h2>{generatedScript.title}</h2></article><article className="hook"><small>ACCROCHE</small><p>{generatedScript.hook}</p></article><article><small>SCRIPT DÉCOUPÉ PAR SCÈNE</small><div className="cs7-scenes">{generatedScript.body.map((line,index) => <p key={line}><b>0{index + 1}</b><span>{line}</span></p>)}</div></article><article><small>TITRE SEO</small><p>{generatedScript.seoTitle}</p></article><article><small>DESCRIPTION RÉFÉRENCÉE</small><p>{generatedScript.description}</p></article><div className="cs7-tags">{generatedScript.tags.map((tag) => <span key={tag}>#{tag.replaceAll(" ", "")}</span>)}</div></> : <div className="cs7-script-empty"><span>✦</span><h2>Votre script apparaîtra ici.</h2><p>Vous obtiendrez un résultat structuré, modifiable et prêt à tourner.</p><ul><li>Un titre orienté clic</li><li>Une accroche pour les premières secondes</li><li>Un découpage scène par scène</li><li>Une description et des mots-clés SEO</li></ul></div>}</section></div>
           </>}
 
-          {view === "admin" && <><div className="cs2-page-title"><div><span>CENTRE DE CONTRÔLE</span><h1>Administration</h1><p>Pilotez les clients, les abonnements, les quotas, les connexions et la santé du produit.</p></div><span className="cs7-admin-live">● Système opérationnel</span></div><div className="cs7-admin-kpis">{[["Clients actifs","128","+12 ce mois"],["Revenu mensuel","9 840 €","+18,4 %"],["Vidéos traitées","18 420","72 % du quota"],["Tickets ouverts","7","2 prioritaires"]].map(([label,value,detail]) => <article key={label}><span>{label}</span><strong>{value}</strong><small>{detail}</small></article>)}</div><div className="cs7-admin-grid"><section className="cs2-panel"><header><h2>Intégrations de production</h2><span>Configuration</span></header>{[["Instagram + Facebook","Meta OAuth","Identifiants requis"],["YouTube","Google OAuth","Identifiants requis"],["TikTok","TikTok Login Kit","Identifiants requis"],["LinkedIn","LinkedIn OAuth","Identifiants requis"],["Stripe","Abonnements + factures","Connexion requise"],["Analyse IA","Vercel AI Gateway","Clé requise"]].map(([name,type,status]) => <div className="cs7-integration" key={name}><i>○</i><span><b>{name}</b><small>{type}</small></span><em>{status}</em></div>)}</section><section className="cs2-panel"><header><h2>Quotas par offre</h2><span>Application automatique</span></header>{plans.map((item,index) => <div className="cs7-quota" key={item.name}><span><b>{item.name}</b><small>{item.price} € / mois</small></span><i><b style={{width:`${[34,68,88][index]}%`}} /></i><strong>{["30 clips","150 clips","Illimité"][index]}</strong></div>)}</section><section className="cs2-panel cs7-admin-wide"><header><h2>Suivi produit</h2><span>Dernières 24 h</span></header><div className="cs7-health">{[["Disponibilité","99,98 %","good"],["Temps de réponse","184 ms","good"],["Erreurs API","0,12 %","good"],["Conversion essai","8,7 %","up"]].map(([label,value,tone]) => <div key={label} className={tone}><span>{label}</span><strong>{value}</strong><i /></div>)}</div></section></div></>}
+          {view === "admin" && isAdmin && <><div className="cs2-page-title"><div><span>ACCÈS PROPRIÉTAIRE SÉCURISÉ</span><h1>Administration</h1><p>Accordez ou retirez un accès gratuit complet à ClipScale depuis une simple adresse e-mail.</p></div><span className="cs7-admin-live">● Administrateur vérifié</span></div><div className="cs7-admin-kpis"><article><span>Accès offerts</span><strong><AnimatedNumber value={accessGrants.filter((item) => item.active).length} /></strong><small>comptes actuellement actifs</small></article><article><span>Accès suspendus</span><strong><AnimatedNumber value={accessGrants.filter((item) => !item.active).length} /></strong><small>réactivables à tout moment</small></article><article><span>Niveau attribué</span><strong>Agency</strong><small>toutes les fonctions incluses</small></article><article><span>Activation</span><strong>Instantanée</strong><small>à la prochaine connexion</small></article></div><div className="cs9-admin-access"><section className="cs2-panel cs9-grant-form"><div className="cs9-admin-heading"><span>01</span><div><h2>Offrir un accès complet</h2><p>La personne devra créer son compte ou se connecter avec exactement cette adresse.</p></div></div><label>Adresse e-mail<input type="email" value={grantEmail} onChange={(event) => setGrantEmail(event.target.value)} placeholder="client@exemple.com" /></label><label>Note interne — facultatif<input value={grantNote} onChange={(event) => setGrantNote(event.target.value)} placeholder="Ex. Partenaire, créateur, bêta-testeur…" /></label><button className="cs2-button" disabled={grantSaving || !grantEmail.trim()} onClick={addAccessGrant}>{grantSaving ? "Activation…" : "Activer l’accès Agency offert →"}</button><div className="cs9-security-note"><b>Accès sécurisé</b><p>Aucun mot de passe n’est créé ou partagé. L’accès est lié à l’identité Supabase de l’adresse e-mail et peut être suspendu instantanément.</p></div></section><section className="cs2-panel cs9-grant-list"><div className="cs9-admin-heading"><span>02</span><div><h2>Accès accordés</h2><p>{accessGrants.length ? `${accessGrants.length} adresse${accessGrants.length > 1 ? "s" : ""} enregistrée${accessGrants.length > 1 ? "s" : ""}` : "Aucun accès offert pour le moment"}</p></div></div>{accessGrants.length ? <div className="cs9-access-rows">{accessGrants.map((grant) => <article key={grant.id} className={grant.active ? "active" : "paused"}><div className="cs9-access-avatar">{grant.email.slice(0, 2).toUpperCase()}</div><div><b>{grant.email}</b><span>{grant.note || "Accès gratuit complet"} · {new Date(grant.created_at).toLocaleDateString("fr-FR")}</span></div><em>{grant.active ? "Agency offert" : "Suspendu"}</em><button onClick={() => toggleAccessGrant(grant)}>{grant.active ? "Suspendre" : "Réactiver"}</button></article>)}</div> : <div className="cs9-empty-access"><span>✦</span><b>La liste est vide.</b><p>Ajoutez votre première adresse avec le formulaire.</p></div>}</section></div></>}
 
           {view === "team" && <>
             <div className="cs2-page-title"><div><span>COLLABORATION</span><h1>Équipe</h1><p>Répartissez la charge avant qu’elle ne devienne un problème.</p></div><button className="cs2-button" onClick={() => notify("Invitation simulée — mode démo")}>Inviter un membre</button></div>
@@ -579,7 +616,7 @@ function AppShell({ exit, plan, userId, signOut, theme, toggleTheme }: { exit: (
 
           {view === "settings" && <>
             <div className="cs2-page-title"><div><span>ESPACE</span><h1>Réglages</h1><p>Configurez les informations principales de votre agence.</p></div></div>
-            <div className="cs2-subscription-card"><div><span>{userId ? "ESSAI ACTIF · 14 JOURS" : "ABONNEMENT · DÉMONSTRATION"}</span><h2>Plan {plan}</h2><p>Statistiques avancées, publication multicanale et analyse virale incluses.</p></div><div><b>{plans.find((item) => item.name === plan)?.price ?? 79}€ <small>/ mois HT</small></b><button onClick={exit}>Comparer les offres</button></div></div>
+            <div className="cs2-subscription-card"><div><span>{complimentaryAccess ? "ACCÈS OFFERT PAR L’ADMINISTRATEUR" : userId ? "ESSAI ACTIF · 14 JOURS" : "ABONNEMENT · DÉMONSTRATION"}</span><h2>Plan {complimentaryAccess ? "Agency" : plan}</h2><p>{complimentaryAccess ? "Toutes les fonctionnalités sont débloquées gratuitement sur ce compte." : "Statistiques avancées, publication multicanale et analyse virale incluses."}</p></div><div><b>{complimentaryAccess ? "0€" : `${plans.find((item) => item.name === plan)?.price ?? 79}€`} <small>{complimentaryAccess ? "accès offert" : "/ mois HT"}</small></b><button onClick={exit}>Comparer les offres</button></div></div>
             <div className="cs2-panel cs2-settings"><h2>Informations de l’agence</h2><label>Nom de l’espace<input defaultValue="ClipScale Studio" /></label><label>Email de contact<input type="email" defaultValue="bonjour@clipscale.app" /></label><label>Fuseau horaire<select defaultValue="Europe/Paris"><option>Europe/Paris</option><option>America/New_York</option></select></label><button className="cs2-button" onClick={() => notify("Réglages enregistrés dans la démo")}>Enregistrer</button></div>
             {userId && <button className="cs4-signout" onClick={signOut}>Se déconnecter</button>}
           </>}
