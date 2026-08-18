@@ -1,10 +1,4 @@
 @import "tailwindcss";
-@import "./premium.css";
-@import "./upgrade.css";
-@import "./optimization.css";
-@import "./persona.css";
-@import "./visual-v2.css";
-@import "./dashboard-v2.css";
 @import "./marketplace/marketplace.css";
 @import "./marketplace/candidates.css";
 :root{--bg:#08090c;--panel:#111218;--line:#252630;--muted:#7c7f89;--violet:#7658ea;--text:#f4f4f7}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}button,a{font:inherit}button{cursor:pointer}.brand{border:0;background:none;color:white;display:flex;align-items:center;gap:10px;font-weight:750;font-size:19px}.mark{display:inline-flex;gap:3px;align-items:end;height:24px;transform:skew(-18deg)}.mark i{width:5px;background:#8264ff;border-radius:1px}.mark i:nth-child(1){height:13px}.mark i:nth-child(2){height:20px}.mark i:nth-child(3){height:16px}
