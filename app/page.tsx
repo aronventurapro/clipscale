@@ -108,8 +108,16 @@ const motionSteps = [
   { number: "04", label: "Publiez", detail: "Votre campagne part depuis un cockpit." },
 ];
 
+const creatorResults = [
+  { name: "Yomi Denzel", initials: "YD", views: 4_500_000, compactValue: 4.5, compactSuffix: " M", share: 100, accent: "#a991ff" },
+  { name: "Mauno", initials: "MA", views: 2_500_000, compactValue: 2.5, compactSuffix: " M", share: 56, accent: "#7d9cff" },
+  { name: "Keo", initials: "KE", views: 1_200_000, compactValue: 1.2, compactSuffix: " M", share: 27, accent: "#64d7b2" },
+  { name: "Blyaat", initials: "BL", views: 79_000, compactValue: 79, compactSuffix: " k", share: 8, accent: "#f0a66a" },
+];
+
 function Landing({ launch }: { launch: (plan?: string, requireAccount?: boolean) => void }) {
   const [spotlight, setSpotlight] = useState<"analyse" | "publication" | "pilotage">("analyse");
+  const [activeCreator, setActiveCreator] = useState(0);
   const [openFaq, setOpenFaq] = useState(0);
   const spotlightTabs = ["analyse", "publication", "pilotage"] as const;
   const navigateSpotlight = (event: KeyboardEvent<HTMLButtonElement>, current: typeof spotlightTabs[number]) => {
@@ -182,7 +190,17 @@ function Landing({ launch }: { launch: (plan?: string, requireAccount?: boolean)
 
       <section className="cs3-results"><div className="cs3-section-tag">RÉSULTATS ATTENDUS</div><h2>Moins d’opérations.<br />Plus de contenu publié.</h2><div className="cs3-results-grid"><article><strong><AnimatedNumber value={68} prefix="−" suffix="%" duration={1600}/></strong><p>de temps consacré à la diffusion</p><small>Scénario agence · 5 clients</small></article><article><strong><AnimatedNumber value={3} prefix="×" duration={1300}/></strong><p>plus de variantes publiées</p><small>Scénario créateur · 4 réseaux</small></article><article><strong><AnimatedNumber value={24} prefix="+" suffix="%" duration={1500}/></strong><p>de vues hebdomadaires</p><small>Projection issue du tableau de bord démo</small></article></div><p className="cs3-results-disclaimer">Ces chiffres illustrent des scénarios de démonstration. Les résultats réels dépendent du contenu, de l’audience et des plateformes.</p></section>
 
-      <section className="cs3-comparison"><div className="cs3-section-tag">COMPARER LES OFFRES</div><h2>Le bon niveau de puissance,<br />sans payer pour le reste.</h2><div className="cs3-comparison-table" role="table" aria-label="Comparaison des offres ClipScale"><div className="head" role="row"><span role="columnheader">Fonctionnalité</span>{plans.map((plan) => <b role="columnheader" key={plan.name}>{plan.name}<small>{plan.price}€/mois</small></b>)}</div>{[["Clips par mois","30","150","Illimités"],["Réseaux connectés","4","10","10"],["Membres inclus","1","3","10"],["Analyse virale","✓","✓","✓"],["Variantes par réseau","—","✓","✓"],["Espaces clients","—","—","✓"],["Support","Email","Prioritaire","Dédié"]].map((row) => <div role="row" key={row[0]}><span role="cell">{row[0]}</span>{row.slice(1).map((cell,index) => <b role="cell" key={`${row[0]}-${index}`}>{cell}</b>)}</div>)}</div></section>
+      <section className="cs6-proof" aria-labelledby="creator-results-title">
+        <div className="cs6-proof-orb one" aria-hidden="true" /><div className="cs6-proof-orb two" aria-hidden="true" />
+        <header className="cs6-proof-head"><div><div className="cs3-section-tag">DES RÉSULTATS QUI SE MESURENT</div><h2 id="creator-results-title">Des créateurs ambitieux.<br /><em>Des millions de vues.</em></h2><p>Découvrez les performances générées au fil de mes collaborations avec des créateurs reconnus.</p></div><div className="cs6-proof-total"><span>VUES GÉNÉRÉES AU TOTAL</span><strong><AnimatedNumber value={8_279_000} suffix="+" duration={1900} /></strong><small>sur ces quatre collaborations</small><i><b /></i></div></header>
+        <div className="cs6-proof-shell">
+          <div className="cs6-proof-focus" key={creatorResults[activeCreator].name} style={{ "--creator-accent": creatorResults[activeCreator].accent } as CSSProperties}>
+            <span className="cs6-proof-rank">0{activeCreator + 1} · COLLABORATION</span><div className="cs6-proof-avatar">{creatorResults[activeCreator].initials}<i /></div><div className="cs6-proof-focus-copy"><small>CRÉATEUR ACCOMPAGNÉ</small><h3>{creatorResults[activeCreator].name}</h3><p>Une stratégie de contenu pensée pour maximiser l’accroche, la rétention et la distribution multicanale.</p></div><div className="cs6-proof-number"><span>VUES GÉNÉRÉES</span><strong><AnimatedNumber value={creatorResults[activeCreator].views} duration={1700} /></strong><small>grâce à la collaboration</small></div><div className="cs6-proof-signal" aria-hidden="true">{[28,46,39,64,52,82,68,96,78,100].map((height,index) => <i key={index} style={{ height: `${height}%`, animationDelay: `${index * 70}ms` }} />)}</div>
+          </div>
+          <div className="cs6-proof-list" aria-label="Choisir un résultat créateur">{creatorResults.map((creator,index) => <button type="button" aria-pressed={activeCreator === index} className={activeCreator === index ? "active" : ""} onClick={() => setActiveCreator(index)} key={creator.name} style={{ "--creator-accent": creator.accent } as CSSProperties}><span className="cs6-proof-mini-avatar">{creator.initials}</span><span className="cs6-proof-name"><b>{creator.name}</b><small>Collaboration créateur</small></span><strong><AnimatedNumber value={creator.compactValue} decimals={creator.compactValue % 1 ? 1 : 0} suffix={creator.compactSuffix} /></strong><i><b style={{ width: `${creator.share}%` }} /></i><em>→</em></button>)}</div>
+        </div>
+        <p className="cs6-proof-note">Résultats communiqués par Aron Ventura · Les performances varient selon le contenu, l’audience et les plateformes.</p>
+      </section>
 
       <section className="cs3-pricing" id="pricing"><div className="cs3-section-tag">DES OFFRES QUI ÉVOLUENT AVEC VOUS</div><div className="cs3-pricing-head"><h2>Commencez simplement.<br /><em>Passez à l’échelle.</em></h2><p>Chaque formule inclut le cockpit de production, l’analyse virale et la préparation multicanale.</p></div><div className="cs3-pricing-grid">{plans.map((plan) => <article key={plan.name} className={plan.popular ? "popular" : ""}>{plan.popular && <span className="cs3-popular-label">LE PLUS CHOISI</span>}<header><span>{plan.name}</span><p>{plan.description}</p></header><div className="cs3-price"><strong><AnimatedNumber value={plan.price} suffix="€" /></strong><small>/ mois<br />HT</small></div><ul>{plan.features.map((feature) => <li key={feature}><i>✓</i>{feature}</li>)}</ul><button type="button" onClick={() => launch(plan.name, true)}>{plan.cta}<span>→</span></button><small>Sans engagement · Annulation à tout moment</small></article>)}</div><p className="cs3-pricing-note">Le paiement sécurisé sera activé via Stripe. Créez votre compte pour préparer votre espace dès maintenant.</p></section>
 
