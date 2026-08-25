@@ -130,7 +130,7 @@ const additionalCreators = [
   { image: "/creator-results/collaboration-3.webp", position: "center 35%" },
 ];
 
-function Landing({ launch, theme, toggleTheme }: { launch: (plan?: string) => void; theme: "dark" | "light"; toggleTheme: () => void }) {
+function Landing({ launch, theme, toggleTheme }: { launch: (plan?: string, mode?: "signup" | "signin") => void; theme: "dark" | "light"; toggleTheme: () => void }) {
   const [spotlight, setSpotlight] = useState<"analyse" | "publication" | "pilotage">("analyse");
   const [activeCreator, setActiveCreator] = useState(0);
   const [openFaq, setOpenFaq] = useState(0);
@@ -151,7 +151,7 @@ function Landing({ launch, theme, toggleTheme }: { launch: (plan?: string) => vo
       <header className="cs3-header">
         <a href="#top" aria-label="Accueil ClipScale"><Logo /></a>
         <nav aria-label="Navigation principale"><a href="/missions">Missions</a><a href="/clippeurs">Clippeurs</a><a href="/comment-ca-marche">Fonctionnement</a><a href="/tarifs">Tarifs</a><a href="/cas-clients">Cas clients</a></nav>
-        <div className="cs-theme-actions"><button type="button" className="cs-theme-toggle" onClick={toggleTheme} aria-label={theme === "dark" ? "Activer le mode clair" : "Activer le mode sombre"} title={theme === "dark" ? "Mode clair" : "Mode sombre"}><span aria-hidden="true">{theme === "dark" ? "☀" : "☾"}</span></button><button type="button" className="cs3-nav-cta" onClick={() => launch()}>Se connecter <span aria-hidden="true">→</span></button></div>
+        <div className="cs-theme-actions"><button type="button" className="cs-theme-toggle" onClick={toggleTheme} aria-label={theme === "dark" ? "Activer le mode clair" : "Activer le mode sombre"} title={theme === "dark" ? "Mode clair" : "Mode sombre"}><span aria-hidden="true">{theme === "dark" ? "☀" : "☾"}</span></button><button type="button" className="cs3-nav-cta" onClick={() => launch("Scale", "signin")}>Se connecter <span aria-hidden="true">→</span></button></div>
       </header>
 
       <section className="cs3-hero" id="main-content">
@@ -160,7 +160,7 @@ function Landing({ launch, theme, toggleTheme }: { launch: (plan?: string) => vo
           <div className="cs3-kicker"><span><i /> CLIPSCALE</span> L’agence qui construit votre équipe de clipping <b aria-hidden="true">→</b></div>
           <h1>Trouvez. Produisez.<br /><em>Mesurez.</em></h1>
           <p>Confiez votre besoin à ClipScale. Nous sélectionnons les bons clippeurs, pilotons la production et vous gardez une vision claire des résultats.</p>
-          <div className="cs13-role-actions" aria-label="Accéder à ClipScale"><button type="button" className="cs3-primary" onClick={() => launch()}><small>POUR LES CRÉATEURS</small> Commencer <span aria-hidden="true">→</span></button><button type="button" className="cs13-clipper-cta" onClick={() => launch()}><small>POUR LES CLIPPEURS</small> Se connecter <span aria-hidden="true">→</span></button></div>
+          <div className="cs16-single-cta"><button type="button" className="cs3-primary" onClick={() => launch("Scale", "signup")}>Créer mon espace ClipScale <span aria-hidden="true">→</span></button><button type="button" className="cs16-signin-link" onClick={() => launch("Scale", "signin")}>Déjà inscrit ? <b>Se connecter</b></button></div>
           <div className="cs3-reassurance"><span>✓ Un interlocuteur ClipScale</span><span>✓ Clippeurs sélectionnés</span><span>✓ Production suivie de bout en bout</span></div>
         </div>
 
@@ -233,8 +233,8 @@ function Status({ children }: { children: string }) {
   return <span className={`cs2-status ${slug}`}>{children}</span>;
 }
 
-function AuthModal({ plan, close, authenticated }: { plan: string; close: () => void; authenticated: (userId: string) => void }) {
-  const [mode, setMode] = useState<"signup" | "signin" | "reset">("signup");
+function AuthModal({ plan, close, authenticated, initialMode }: { plan: string; close: () => void; authenticated: (userId: string) => void; initialMode: "signup" | "signin" }) {
+  const [mode, setMode] = useState<"signup" | "signin" | "reset">(initialMode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
@@ -771,6 +771,7 @@ export default function Home() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [accountRole, setAccountRole] = useState<AccountRole | null>(null);
   const [sessionError, setSessionError] = useState("");
+  const [authMode, setAuthMode] = useState<"signup" | "signin">("signup");
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [cookieChoice, setCookieChoice] = useState<"accepted" | "essential" | null>(null);
   useEffect(() => {
@@ -808,14 +809,15 @@ export default function Home() {
     if (data?.onboarding_complete && ["Agence","Créateur","Clippeur"].includes(String(data.role_type))) { setAccountRole(data.role_type as AccountRole); setInApp(true); }
     else setShowOnboarding(true);
   };
-  const launch = async (plan = "Scale", _requireAccount = false) => {
+  const launch = async (plan = "Scale", mode: "signup" | "signin" = "signup") => {
     setSelectedPlan(plan);
     if (userId) { await openAuthenticatedApp(userId); return; }
+    setAuthMode(mode);
     setShowAuth(true);
   };
   const signOut = async () => { await supabase.auth.signOut(); setUserId(null); setUserEmail(null); setAccountRole(null); setInApp(false); setShowOnboarding(false); };
   const toggleTheme = () => setTheme((current) => { const next = current === "dark" ? "light" : "dark"; window.localStorage.setItem("clipscale-theme", next); return next; });
   const chooseCookies = (choice: "accepted" | "essential") => { window.localStorage.setItem("clipscale-cookie-choice", choice); setCookieChoice(choice); };
   if (sessionLoading) return <div className={`cs-theme cs-theme-${theme}`}><div className="cs10-session-loader"><Logo/><div><i/><i/><i/></div><p>Ouverture sécurisée de votre espace…</p></div></div>;
-  return <div className={`cs-theme cs-theme-${theme}`}>{sessionError && <div className="cs15-session-error" role="alert">{sessionError}<button onClick={() => location.reload()}>Réessayer</button></div>}{showOnboarding && userId ? <Onboarding userId={userId} plan={selectedPlan} done={(role) => { setAccountRole(role); setShowOnboarding(false); setInApp(true); }} /> : inApp && userId && accountRole === "Clippeur" ? <ClipperWorkspace userName={userName} signOut={signOut} changeRole={() => { setInApp(false); setShowOnboarding(true); }} /> : inApp && userId ? <AppShell exit={() => setInApp(false)} plan={selectedPlan} userId={userId} userEmail={userEmail} userName={userName} signOut={signOut} theme={theme} toggleTheme={toggleTheme} /> : <Landing launch={launch} theme={theme} toggleTheme={toggleTheme} />}{showAuth && <AuthModal plan={selectedPlan} close={() => setShowAuth(false)} authenticated={openAuthenticatedApp} />}{!cookieChoice && <aside className="cs7-cookie" aria-label="Préférences de confidentialité"><div><b>Vos choix, clairement.</b><p>Les éléments essentiels assurent le fonctionnement de ClipScale. Les mesures d’audience optionnelles nous aident à améliorer le produit.</p><a href="/confidentialite">En savoir plus</a></div><div><button onClick={() => chooseCookies("essential")}>Essentiels uniquement</button><button className="cs2-button" onClick={() => chooseCookies("accepted")}>Tout accepter</button></div></aside>}</div>;
+  return <div className={`cs-theme cs-theme-${theme}`}>{sessionError && <div className="cs15-session-error" role="alert">{sessionError}<button onClick={() => location.reload()}>Réessayer</button></div>}{showOnboarding && userId ? <Onboarding userId={userId} plan={selectedPlan} done={(role) => { setAccountRole(role); setShowOnboarding(false); setInApp(true); }} /> : inApp && userId && accountRole === "Clippeur" ? <ClipperWorkspace userName={userName} signOut={signOut} changeRole={() => { setInApp(false); setShowOnboarding(true); }} /> : inApp && userId ? <AppShell exit={() => setInApp(false)} plan={selectedPlan} userId={userId} userEmail={userEmail} userName={userName} signOut={signOut} theme={theme} toggleTheme={toggleTheme} /> : <Landing launch={launch} theme={theme} toggleTheme={toggleTheme} />}{showAuth && <AuthModal key={authMode} plan={selectedPlan} initialMode={authMode} close={() => setShowAuth(false)} authenticated={openAuthenticatedApp} />}{!cookieChoice && <aside className="cs7-cookie" aria-label="Préférences de confidentialité"><div><b>Vos choix, clairement.</b><p>Les éléments essentiels assurent le fonctionnement de ClipScale. Les mesures d’audience optionnelles nous aident à améliorer le produit.</p><a href="/confidentialite">En savoir plus</a></div><div><button onClick={() => chooseCookies("essential")}>Essentiels uniquement</button><button className="cs2-button" onClick={() => chooseCookies("accepted")}>Tout accepter</button></div></aside>}</div>;
 }
