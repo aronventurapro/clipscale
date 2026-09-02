@@ -14,6 +14,23 @@ test("production dependencies pass the security audit", async () => {
   );
 });
 
+test("legal notices describe the real beta data flows", async () => {
+  const privacy = await readFile(new URL("app/confidentialite/page.tsx", root), "utf8");
+  const terms = await readFile(new URL("app/conditions/page.tsx", root), "utf8");
+  assert.doesNotMatch(privacy, /ne crée pas de compte|n’enregistre pas/i);
+  for (const provider of ["Supabase", "Vercel", "OpenAI", "Shotstack"])
+    assert.match(privacy, new RegExp(provider));
+  assert.match(privacy, /30 jours/);
+  assert.match(terms, /Aucun abonnement payant/);
+});
+
+test("operational health reports readiness without exposing secrets", async () => {
+  const health = await readFile(new URL("app/api/health/route.ts", root), "utf8");
+  for (const service of ["database", "analysis", "rendering", "payments"])
+    assert.match(health, new RegExp(service));
+  assert.doesNotMatch(health, /process\.env\.[A-Z_]+\s*[,}]/);
+});
+
 test("global browser hardening headers are configured", async () => {
   const config = await readFile(new URL("next.config.ts", root), "utf8");
   for (const header of [
