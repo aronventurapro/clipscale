@@ -41,14 +41,21 @@ export async function POST(request: Request) {
   const videoId = String(body.videoId || ""); if (!uuid.test(videoId)) return jsonError("Vidéo invalide", 400, auth.requestId);
   const { data: video } = await auth.supabase.from("studio_videos").select("id,file_path,duration_seconds,hook,platform").eq("id", videoId).eq("user_id", auth.user.id).single();
   if (!video?.file_path) return jsonError("Vidéo introuvable", 404, auth.requestId);
+  const reservedMinutes = Math.max(1, Math.ceil(Number(video.duration_seconds || 0) / 60));
+  const { data: quota, error: quotaError } = await auth.supabase.rpc("reserve_video_minutes", { p_video_id: videoId, p_minutes: reservedMinutes }).maybeSingle();
+  if (quotaError) {
+    const quotaExceeded = quotaError.message.includes("quota_exceeded");
+    const inactive = quotaError.message.includes("subscription_inactive");
+    return jsonError(quotaExceeded ? "Quota mensuel atteint" : inactive ? "Accès au traitement suspendu" : "Contrôle des crédits indisponible", quotaExceeded ? 402 : 503, auth.requestId);
+  }
   const { data: signed } = await auth.supabase.storage.from("studio-videos").createSignedUrl(video.file_path, 1_800);
-  if (!signed?.signedUrl) return jsonError("Source inaccessible", 502, auth.requestId);
+  if (!signed?.signedUrl) { await auth.supabase.rpc("release_video_minutes", { p_video_id: videoId }); return jsonError("Source inaccessible", 502, auth.requestId); }
   const sourceId = await startIngest(signed.signedUrl, config.shotstack, config.stage);
-  if (!sourceId) return jsonError("Shotstack n’a pas accepté la transcription", 502, auth.requestId);
+  if (!sourceId) { await auth.supabase.rpc("release_video_minutes", { p_video_id: videoId }); return jsonError("Shotstack n’a pas accepté la transcription", 502, auth.requestId); }
   const { data: job, error } = await auth.supabase.from("processing_jobs").insert({ user_id: auth.user.id, video_id: videoId, job_type: "transcribe", status: "processing", progress: 5, attempts: 1, max_attempts: 3, provider: "shotstack", provider_job_id: sourceId, input: { duration: video.duration_seconds, hook: video.hook, platform: video.platform }, started_at: new Date().toISOString() }).select("id").single();
-  if (error || !job) return jsonError("Traitement non enregistré", 502, auth.requestId);
+  if (error || !job) { await auth.supabase.rpc("release_video_minutes", { p_video_id: videoId }); return jsonError("Traitement non enregistré", 502, auth.requestId); }
   await auth.supabase.from("studio_videos").update({ progress: 5, error_message: null, updated_at: new Date().toISOString() }).eq("id", videoId).eq("user_id", auth.user.id);
-  return Response.json({ jobId: job.id, status: "processing", progress: 5, requestId: auth.requestId }, { status: 202, headers: { "Cache-Control": "no-store" } });
+  return Response.json({ jobId: job.id, status: "processing", progress: 5, quota, requestId: auth.requestId }, { status: 202, headers: { "Cache-Control": "no-store" } });
 }
 
 export async function GET(request: Request) {

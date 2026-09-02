@@ -54,6 +54,16 @@ test("commercial workflows are persistent and use Supabase auth", async () => {
   assert.doesNotMatch(marketplaceDb, /DemoStore|globalThis|cloudflare:workers/);
 });
 
+test("video processing reserves monthly usage atomically", async () => {
+  const processRoute = await readFile(new URL("app/api/studio/process/route.ts", root), "utf8");
+  const quotaMigration = await readFile(new URL("supabase/migrations/20260902044500_atomic_usage_quotas.sql", root), "utf8");
+  assert.match(processRoute, /reserve_video_minutes/);
+  assert.match(processRoute, /release_video_minutes/);
+  assert.match(processRoute, /Quota mensuel atteint/);
+  assert.match(quotaMigration, /pg_advisory_xact_lock/);
+  assert.match(quotaMigration, /quota_exceeded/);
+});
+
 test("no server secret is embedded in tracked source", async () => {
   const files = ["app/api/studio/analyze/route.ts", "app/api/studio/render/route.ts", "lib/server-security.ts"];
   for (const path of files) {
