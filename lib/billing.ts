@@ -5,7 +5,7 @@ export const BILLING_PLANS = {
     sourceMinutes: 120,
     renderedMinutes: 30,
     members: 1,
-    paymentLink: "https://buy.stripe.com/eVq3cu5Zw3e5gx03jhd7q0t",
+    paymentLink: "https://buy.stripe.com/4gMcN473A4i9gx04nld7q0x",
   },
   pro: {
     label: "Pro",
@@ -13,7 +13,7 @@ export const BILLING_PLANS = {
     sourceMinutes: 400,
     renderedMinutes: 100,
     members: 3,
-    paymentLink: "https://buy.stripe.com/14A6oG3Ro3e5bcGaLJd7q0u",
+    paymentLink: "https://buy.stripe.com/9B600i9bIaGx2GacTRd7q0y",
   },
   agency: {
     label: "Agency",
@@ -21,7 +21,7 @@ export const BILLING_PLANS = {
     sourceMinutes: 1000,
     renderedMinutes: 250,
     members: 10,
-    paymentLink: "https://buy.stripe.com/6oUaEWew28ypgx0f1Zd7q0v",
+    paymentLink: "https://buy.stripe.com/3cI6oG5Zw15X1C6aLJd7q0z",
   },
 } as const;
 
