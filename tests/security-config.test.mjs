@@ -31,6 +31,24 @@ test("operational health reports readiness without exposing secrets", async () =
   assert.doesNotMatch(health, /process\.env\.[A-Z_]+\s*[,}]/);
 });
 
+test("account data rights are authenticated, rate limited and owner scoped", async () => {
+  const accountRoutes = [
+    "app/api/account/export/route.ts",
+    "app/api/account/deletion-request/route.ts",
+  ];
+  for (const path of accountRoutes) {
+    const source = await readFile(new URL(path, root), "utf8");
+    assert.match(source, /authenticate/);
+    assert.match(source, /consumeRateLimit/);
+    assert.match(source, /auth\.user\.id/);
+    assert.match(source, /Cache-Control/);
+  }
+  const deletion = await readFile(new URL(accountRoutes[1], root), "utf8");
+  assert.match(deletion, /hasAllowedOrigin/);
+  assert.match(deletion, /Vérifier l’identité/);
+  assert.doesNotMatch(deletion, /deleteUser\(/);
+});
+
 test("global browser hardening headers are configured", async () => {
   const config = await readFile(new URL("next.config.ts", root), "utf8");
   for (const header of [
