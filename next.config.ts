@@ -3,6 +3,15 @@ import { withWorkflow } from "workflow/next";
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  async redirects() {
+    return [
+      { source: "/missions", destination: "/#missions", permanent: false },
+      { source: "/clippeurs", destination: "/#clippeurs", permanent: false },
+      { source: "/comment-ca-marche", destination: "/#workflow", permanent: false },
+      { source: "/tarifs", destination: "/#pricing", permanent: false },
+      { source: "/cas-clients", destination: "/#cas-clients", permanent: false },
+    ];
+  },
   async headers() {
     const securityHeaders = [
       { key: "Content-Security-Policy", value: "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' blob: https:; font-src 'self' data:; connect-src 'self' https://rtnkxqoenakebgeuittq.supabase.co https://rtnkxqoenakebgeuittq.storage.supabase.co wss://rtnkxqoenakebgeuittq.supabase.co https://*.vercel-insights.com; worker-src 'self' blob:; upgrade-insecure-requests" },

@@ -13,6 +13,7 @@
 }
 .cs15-failed-jobs{display:grid;gap:10px;margin:0 0 18px;padding:16px;border:1px solid #7d3445;border-radius:14px;background:#2b131a;color:#ffdbe2}.cs15-failed-jobs>div{display:flex;flex-direction:column;gap:4px}.cs15-failed-jobs>div span{font-size:12px;color:#d6a9b3}.cs15-failed-jobs article{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;background:#ffffff08}.cs15-failed-jobs article small{color:#d6a9b3}.cs15-failed-jobs button{border:1px solid #9a4a5d;border-radius:8px;background:#3b1821;color:#fff;padding:8px 12px}.cs15-failed-jobs button:disabled{opacity:.5}
 @media(max-width:640px){.cs15-failed-jobs article{grid-template-columns:1fr}.cs15-failed-jobs button{width:100%}}
+
 .cs14-marquee:before,
 .cs14-marquee:after {
   content: "";
@@ -785,5 +786,44 @@
   }
   .cs17-editor > footer small {
     display: none;
+  }
+}
+
+/* Navigation marketing et correctifs responsive ciblés */
+#missions,
+#clippeurs,
+#workflow,
+#pricing,
+#cas-clients {
+  scroll-margin-top: 24px;
+}
+.cs6-proof-mini-avatar {
+  position: relative;
+  isolation: isolate;
+  flex: none;
+}
+.cs6-proof-mini-avatar img,
+.cs6-proof-avatar img,
+.cs6-proof-more-stack img {
+  object-fit: cover;
+}
+.cs5-count {
+  display: inline-block;
+  max-width: 100%;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 620px) {
+  .cs3-results-grid strong {
+    font-size: 40px;
+  }
+  .cs6-proof-total strong {
+    font-size: clamp(22px, 7.5vw, 29px);
+  }
+  .cs6-proof-number strong {
+    font-size: clamp(30px, 9.5vw, 44px);
+  }
+  .cs6-proof-list button > strong {
+    font-size: 17px;
   }
 }

@@ -482,11 +482,11 @@ function Landing({
           <Logo />
         </a>
         <nav aria-label="Navigation principale">
-          <a href="/missions">Missions</a>
-          <a href="/clippeurs">Clippeurs</a>
-          <a href="/comment-ca-marche">Fonctionnement</a>
-          <a href="/tarifs">Tarifs</a>
-          <a href="/cas-clients">Cas clients</a>
+          <a href="#missions">Missions</a>
+          <a href="#clippeurs">Clippeurs</a>
+          <a href="#workflow">Fonctionnement</a>
+          <a href="#pricing">Tarifs</a>
+          <a href="#cas-clients">Cas clients</a>
         </nav>
         <div className="cs-theme-actions">
           <button
@@ -904,7 +904,7 @@ function Landing({
         </div>
       </section>
 
-      <section className="cs3-bento">
+      <section className="cs3-bento" id="missions">
         <article className="cs3-bento-large">
           <span>POUR LES CLIENTS</span>
           <h2>
@@ -937,7 +937,7 @@ function Landing({
             </b>
           </div>
         </article>
-        <article className="cs3-bento-dark">
+        <article className="cs3-bento-dark" id="clippeurs">
           <span>CLIPPEURS</span>
           <div className="cs3-mini-ring">
             <AnimatedNumber value={100} />
@@ -1067,7 +1067,11 @@ function Landing({
         </p>
       </section>
 
-      <section className="cs6-proof" aria-labelledby="creator-results-title">
+      <section
+        className="cs6-proof"
+        id="cas-clients"
+        aria-labelledby="creator-results-title"
+      >
         <div className="cs6-proof-orb one" aria-hidden="true" />
         <div className="cs6-proof-orb two" aria-hidden="true" />
         <header className="cs6-proof-head">
