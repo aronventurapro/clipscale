@@ -218,3 +218,21 @@ test("no server secret is embedded in tracked source", async () => {
     assert.doesNotMatch(source, /sk-(?:proj-)?[A-Za-z0-9_-]{20,}/);
   }
 });
+
+test("Stripe billing is authenticated, signed, idempotent and fail closed", async () => {
+  const checkout = await readFile(new URL("app/api/billing/checkout/route.ts", root), "utf8");
+  const webhook = await readFile(new URL("app/api/webhooks/stripe/route.ts", root), "utf8");
+  const billing = await readFile(new URL("lib/billing.ts", root), "utf8");
+  const migration = await readFile(new URL("supabase/migrations/20260902120000_secure_stripe_billing.sql", root), "utf8");
+  for (const control of ["authenticate", "hasAllowedOrigin", "consumeRateLimit", "billingIsReady"])
+    assert.match(checkout, new RegExp(control));
+  assert.match(billing, /createHmac/);
+  assert.match(billing, /timingSafeEqual/);
+  assert.match(webhook, /stripe-signature/);
+  assert.match(webhook, /amount_total/);
+  assert.match(webhook, /mode !== "subscription"/);
+  assert.match(webhook, /stripe_webhook_events/);
+  assert.match(migration, /enable row level security/);
+  assert.match(migration, /revoke all .* anon, authenticated/);
+  assert.doesNotMatch(checkout + webhook + billing, /sk_(?:live|test)_/);
+});
