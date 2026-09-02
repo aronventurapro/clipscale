@@ -60,6 +60,14 @@ type ViralAnalysis = {
   confidence: number;
   run: number;
 };
+type BillingSubscription = {
+  plan: "starter" | "pro" | "agency";
+  status: "active" | "trialing" | "past_due" | "inactive";
+  monthly_minutes: number;
+  monthly_rendered_minutes: number;
+  member_limit: number;
+  cancel_at_period_end: boolean;
+};
 type ClipItem = {
   id: string;
   videoId: string;
@@ -2023,6 +2031,8 @@ function AppShell({
   const [isAdmin, setIsAdmin] = useState(false);
   const [complimentaryAccess, setComplimentaryAccess] =
     useState<AccessGrant | null>(null);
+  const [billingSubscription, setBillingSubscription] =
+    useState<BillingSubscription | null>(null);
   const [accessGrants, setAccessGrants] = useState<AccessGrant[]>([]);
   const [grantEmail, setGrantEmail] = useState("");
   const [grantNote, setGrantNote] = useState("");
@@ -2280,12 +2290,14 @@ function AppShell({
     if (!userId || !normalizedEmail) {
       setIsAdmin(false);
       setComplimentaryAccess(null);
+      setBillingSubscription(null);
       setAccessGrants([]);
       return;
     }
     const [
       { data: admin, error: adminError },
       { data: grant, error: grantError },
+      { data: subscription, error: subscriptionError },
     ] = await Promise.all([
       supabase
         .from("admin_users")
@@ -2298,6 +2310,11 @@ function AppShell({
         .eq("email", normalizedEmail)
         .eq("active", true)
         .maybeSingle(),
+      supabase
+        .from("user_subscriptions")
+        .select("plan,status,monthly_minutes,monthly_rendered_minutes,member_limit,cancel_at_period_end")
+        .eq("user_id", userId)
+        .maybeSingle(),
     ]);
     const adminMode =
       !adminError &&
@@ -2305,6 +2322,9 @@ function AppShell({
       admin?.email?.toLowerCase() === OWNER_EMAIL;
     setIsAdmin(adminMode);
     setComplimentaryAccess(grantError ? null : (grant as AccessGrant | null));
+    setBillingSubscription(
+      subscriptionError ? null : (subscription as BillingSubscription | null),
+    );
     if (adminMode) {
       const { data, error } = await supabase
         .from("access_grants")
@@ -5249,8 +5269,14 @@ function AppShell({
                     <h2>{label}</h2>
                     <strong>{price}<small>/mois</small></strong>
                     <p>{limits}</p>
-                    <button className="cs2-button" onClick={() => void startCheckout(plan)}>
-                      Choisir {label}
+                    <button
+                      className="cs2-button"
+                      disabled={Boolean(billingSubscription && ["active", "trialing"].includes(billingSubscription.status))}
+                      onClick={() => void startCheckout(plan)}
+                    >
+                      {billingSubscription && ["active", "trialing"].includes(billingSubscription.status)
+                        ? billingSubscription.plan === plan ? `${label} actif` : "Abonnement déjà actif"
+                        : `Choisir ${label}`}
                     </button>
                   </article>
                 ))}
@@ -5292,12 +5318,11 @@ function AppShell({
                   <span>€</span>
                   <h3>Aucun mouvement pour le moment.</h3>
                   <p>
-                    Les paiements seront débloqués après validation du compte et
-                    connexion du prestataire de paiement. Aucun faux règlement
-                    n’est affiché.
+                    Vos abonnements et factures apparaîtront ici après leur
+                    confirmation par Stripe. Aucun faux règlement n’est affiché.
                   </p>
                   <div>
-                    <b>Protection prévue</b>
+                    <b>Protection active</b>
                     <small>
                       Paiement sécurisé · commission transparente · facture
                       automatique · suivi des litiges
@@ -5326,25 +5351,33 @@ function AppShell({
                       ? "COMPTE PROPRIÉTAIRE · ACCÈS COMPLET"
                       : complimentaryAccess
                         ? "ACCÈS OFFERT PAR L’ADMINISTRATEUR"
+                        : billingSubscription?.status === "active" || billingSubscription?.status === "trialing"
+                          ? `ABONNEMENT ${billingSubscription.plan.toUpperCase()} · ACTIF`
                         : userId
-                          ? "ACCÈS BÊTA GRATUIT"
+                          ? "COMPTE GRATUIT · TRAITEMENT VERROUILLÉ"
                           : "APERÇU INTERACTIF"}
                   </span>
                   <h2>
                     {isAdmin || complimentaryAccess
                       ? "Plan Agency"
-                      : "Bêta ClipScale"}
+                      : billingSubscription?.status === "active" || billingSubscription?.status === "trialing"
+                        ? `Plan ${billingSubscription.plan.charAt(0).toUpperCase()}${billingSubscription.plan.slice(1)}`
+                        : "Découverte ClipScale"}
                   </h2>
                   <p>
                     {isAdmin || complimentaryAccess
                       ? "Toutes les fonctionnalités Agency sont débloquées sur ce compte."
-                      : "Le moteur est en cours de validation. Aucun abonnement payant n’est actif sur ce compte."}
+                      : billingSubscription?.status === "active" || billingSubscription?.status === "trialing"
+                        ? `${billingSubscription.monthly_minutes} minutes source et ${billingSubscription.monthly_rendered_minutes} minutes rendues par mois.`
+                        : "Vous pouvez découvrir l’espace. Un abonnement est requis avant tout traitement payant."}
                   </p>
                 </div>
                 <div>
                   <b>
                     {isAdmin || complimentaryAccess
                       ? "Complet"
+                      : billingSubscription?.status === "active" || billingSubscription?.status === "trialing"
+                        ? `${billingSubscription.member_limit} membre${billingSubscription.member_limit > 1 ? "s" : ""}`
                       : isDemo
                         ? "Gratuit"
                         : "0 €"}{" "}
@@ -5353,9 +5386,11 @@ function AppShell({
                         ? "compte propriétaire"
                         : complimentaryAccess
                           ? "accès offert"
+                          : billingSubscription?.cancel_at_period_end
+                            ? "annulation programmée"
                           : isDemo
                             ? "aperçu"
-                            : "pendant la bêta"}
+                            : "sans abonnement"}
                     </small>
                   </b>
                   <button onClick={exit}>Voir le site public</button>

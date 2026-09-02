@@ -226,6 +226,7 @@ test("Stripe billing is authenticated, signed, idempotent and fail closed", asyn
   const migration = await readFile(new URL("supabase/migrations/20260902120000_secure_stripe_billing.sql", root), "utf8");
   for (const control of ["authenticate", "hasAllowedOrigin", "consumeRateLimit", "billingIsReady"])
     assert.match(checkout, new RegExp(control));
+  assert.match(checkout, /Un abonnement est déjà actif sur ce compte/);
   assert.match(billing, /createHmac/);
   assert.match(billing, /timingSafeEqual/);
   assert.match(webhook, /stripe-signature/);
@@ -235,4 +236,15 @@ test("Stripe billing is authenticated, signed, idempotent and fail closed", asyn
   assert.match(migration, /enable row level security/);
   assert.match(migration, /revoke all .* anon, authenticated/);
   assert.doesNotMatch(checkout + webhook + billing, /sk_(?:live|test)_/);
+});
+
+test("commercial video processing never provisions an implicit free trial", async () => {
+  const migration = await readFile(
+    new URL("supabase/migrations/20260902124500_commercial_access_consistency.sql", root),
+    "utf8",
+  );
+  assert.doesNotMatch(migration, /insert into public\.user_subscriptions/i);
+  assert.match(migration, /subscription_inactive/);
+  assert.match(migration, /status in \('trialing', 'active'\)/);
+  assert.match(migration, /processing_jobs_clip_id_idx/);
 });

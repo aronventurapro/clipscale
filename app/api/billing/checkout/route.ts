@@ -13,6 +13,16 @@ export async function POST(request: Request) {
   const rateLimit = await consumeRateLimit(auth, "billing_checkout_requested", 8, 600);
   if (!rateLimit.allowed) return jsonError(rateLimit.unavailable ? "Service temporairement indisponible" : "Trop de tentatives", rateLimit.unavailable ? 503 : 429, auth.requestId);
 
+  const { data: currentSubscription, error: subscriptionError } = await auth.supabase
+    .from("user_subscriptions")
+    .select("status")
+    .eq("user_id", auth.user.id)
+    .maybeSingle();
+  if (subscriptionError) return jsonError("Vérification de l’abonnement indisponible", 503, auth.requestId);
+  if (currentSubscription && ["active", "trialing"].includes(currentSubscription.status)) {
+    return jsonError("Un abonnement est déjà actif sur ce compte", 409, auth.requestId);
+  }
+
   let body: { plan?: unknown };
   try {
     body = await request.json();
