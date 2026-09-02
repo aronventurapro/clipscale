@@ -1,4 +1,6 @@
 import { authenticate, bodyWithinLimit, consumeRateLimit, hasAllowedOrigin, jsonError, ownsRender, recordEvent } from "@/lib/server-security";
+import { videoRenderWorkflow } from "@/workflows/video-render";
+import { start as startWorkflow } from "workflow/api";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,6 +20,7 @@ export async function POST(request: Request) {
   if (!bodyWithinLimit(request, 2_048)) return jsonError("Requête trop volumineuse", 413);
   const auth = await authenticate(request);
   if (!auth) return jsonError("Authentification requise", 401);
+  const accessToken = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") || "";
   const rateLimit = await consumeRateLimit(auth, "studio_render_requested", 5, 600);
   if (!rateLimit.allowed) return jsonError(rateLimit.unavailable ? "Contrôle de sécurité indisponible" : "Trop de rendus demandés", rateLimit.unavailable ? 503 : 429, auth.requestId);
   const config = shotstackConfig();
@@ -31,6 +34,9 @@ export async function POST(request: Request) {
     return jsonError("Requête invalide", 400, auth.requestId);
   }
   if (!idPattern.test(clipId)) return jsonError("Clip invalide", 400, auth.requestId);
+
+  const { data: activeRender } = await auth.supabase.from("processing_jobs").select("id,provider_job_id,status,progress").eq("clip_id", clipId).eq("user_id", auth.user.id).eq("job_type", "render").in("status", ["queued", "processing"]).maybeSingle();
+  if (activeRender) return Response.json({ renderId: activeRender.provider_job_id, jobId: activeRender.id, status: activeRender.status, progress: activeRender.progress, duplicate: true, autonomous: true, mode: "sandbox", requestId: auth.requestId }, { status: 202, headers: { "Cache-Control": "no-store" } });
 
   const { data: clip, error } = await auth.supabase
     .from("studio_clips")
@@ -54,6 +60,7 @@ export async function POST(request: Request) {
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 30_000);
+  let createdJobId = "";
   try {
     const caption = clip.caption_style && typeof clip.caption_style === "object" ? clip.caption_style as Record<string, unknown> : {};
     const style = String(clip.edit_style || "dynamic");
@@ -98,14 +105,21 @@ export async function POST(request: Request) {
       return jsonError("Shotstack n’a pas accepté le rendu sandbox", 502, auth.requestId);
     }
     const { data: job } = await auth.supabase.from("processing_jobs").insert({
-      user_id: auth.user.id, video_id: clip.video_id, job_type: "render", status: "processing", progress: 10,
+      user_id: auth.user.id, video_id: clip.video_id, clip_id: clipId, job_type: "render", status: "processing", progress: 10,
       attempts: 1, max_attempts: 3, provider: "shotstack", provider_job_id: payload.response.id,
       input: { clip_id: clipId, edit_style: style, aspect_ratio: clip.aspect_ratio }, started_at: new Date().toISOString(),
     }).select("id").single();
-    await recordEvent(auth, "studio_render_created", { render_id: payload.response.id, clip_id: clipId });
-    return Response.json({ renderId: payload.response.id, jobId: job?.id, status: "queued", mode: "sandbox", requestId: auth.requestId }, { status: 202, headers: { "Cache-Control": "no-store", "X-Request-Id": auth.requestId } });
+    if (!job?.id) return jsonError("Rendu non enregistré", 502, auth.requestId);
+    createdJobId = job.id;
+    const run = await startWorkflow(videoRenderWorkflow, [{ jobId: job.id, userId: auth.user.id, accessToken }], { deploymentId: "latest" });
+    await Promise.all([
+      auth.supabase.from("processing_jobs").update({ workflow_run_id: run.runId, last_heartbeat_at: new Date().toISOString(), lease_expires_at: new Date(Date.now() + 120_000).toISOString(), updated_at: new Date().toISOString() }).eq("id", job.id).eq("user_id", auth.user.id),
+      recordEvent(auth, "studio_render_created", { render_id: payload.response.id, clip_id: clipId }),
+    ]);
+    return Response.json({ renderId: payload.response.id, jobId: job.id, workflowRunId: run.runId, status: "processing", autonomous: true, mode: "sandbox", requestId: auth.requestId }, { status: 202, headers: { "Cache-Control": "no-store", "X-Request-Id": auth.requestId } });
   } catch (error) {
     console.error("shotstack_render_submission_error", { requestId: auth.requestId, type: error instanceof Error ? error.name : "unknown" });
+    if (createdJobId) await auth.supabase.from("processing_jobs").update({ status: "failed", progress: 100, error_message: "Orchestration du rendu indisponible", failure_code: "workflow_start_failed", completed_at: new Date().toISOString(), lease_expires_at: null, updated_at: new Date().toISOString() }).eq("id", createdJobId).eq("user_id", auth.user.id);
     return jsonError(error instanceof Error && error.name === "AbortError" ? "Shotstack ne répond pas" : "Rendu indisponible", 502, auth.requestId);
   } finally {
     clearTimeout(timeout);

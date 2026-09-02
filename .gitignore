@@ -43,3 +43,6 @@ next-env.d.ts
 /.sites-runtime/
 /outputs/
 /work/
+/.swc
+/.next-vinext-stale/
+/supabase/.temp/

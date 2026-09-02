@@ -124,6 +124,28 @@ test("video processing reserves monthly usage atomically", async () => {
   assert.match(quotaMigration, /quota_exceeded/);
 });
 
+test("video pipelines use durable workflows with bounded retries and idempotency", async () => {
+  const processRoute = await readFile(new URL("app/api/studio/process/route.ts", root), "utf8");
+  const renderRoute = await readFile(new URL("app/api/studio/render/route.ts", root), "utf8");
+  const processingWorkflow = await readFile(new URL("workflows/video-processing.ts", root), "utf8");
+  const renderWorkflow = await readFile(new URL("workflows/video-render.ts", root), "utf8");
+  const migration = await readFile(new URL("supabase/migrations/20260902060515_durable_video_jobs.sql", root), "utf8");
+  assert.match(processRoute, /start\(videoProcessingWorkflow/);
+  assert.match(renderRoute, /startWorkflow\(videoRenderWorkflow/);
+  for (const source of [processingWorkflow, renderWorkflow]) {
+    assert.match(source, /"use workflow"/);
+    assert.match(source, /"use step"/);
+    assert.match(source, /maxRetries = 3/);
+    assert.match(source, /last_heartbeat_at/);
+  }
+  assert.match(processingWorkflow, /upsert\(rows/);
+  assert.match(migration, /processing_jobs_one_active_analysis_idx/);
+  assert.match(migration, /processing_jobs_one_active_render_idx/);
+  assert.match(migration, /studio_clips_job_time_unique_idx/);
+  assert.match(migration, /event_type = 'consume'/);
+  assert.doesNotMatch(migration, /values \([^\n]*'video_processed'/);
+});
+
 test("video deletion is authenticated, owner-scoped and removes storage first", async () => {
   const route = await readFile(
     new URL("app/api/studio/videos/[id]/route.ts", root),

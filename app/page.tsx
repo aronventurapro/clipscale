@@ -1941,6 +1941,7 @@ function AppShell({
   const [missionTarget, setMissionTarget] = useState(6);
   const [missionDue, setMissionDue] = useState("");
   const [clips, setClips] = useState<ClipItem[]>([]);
+  const [failedJobs, setFailedJobs] = useState<Array<{ id: string; video_id: string; error_message: string | null; attempts: number; max_attempts: number }>>([]);
   const [showCreate, setShowCreate] = useState(false);
   const [toast, setToast] = useState("");
   const [clipFilter, setClipFilter] = useState("Tous");
@@ -2214,12 +2215,18 @@ function AppShell({
       ),
     );
   }, [userId]);
+  const loadFailedJobs = useCallback(async () => {
+    if (!userId) return;
+    const { data } = await supabase.from("processing_jobs").select("id,video_id,error_message,attempts,max_attempts").eq("status", "failed").in("job_type", ["transcribe", "analyse"]).order("updated_at", { ascending: false }).limit(5);
+    setFailedJobs((data || []) as Array<{ id: string; video_id: string; error_message: string | null; attempts: number; max_attempts: number }>);
+  }, [userId]);
   useEffect(() => {
     const timer = window.setTimeout(() => {
       void loadStudioClips();
+      void loadFailedJobs();
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [loadStudioClips]);
+  }, [loadFailedJobs, loadStudioClips]);
   useEffect(() => {
     if (!userId) return;
     let active = true;
@@ -2982,6 +2989,15 @@ function AppShell({
     notify(
       "Le traitement continue en arrière-plan et reprendra à votre retour",
     );
+  };
+  const retryProcessingJob = async (jobId: string) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) { notify("Reconnectez-vous pour relancer le traitement"); return; }
+    const response = await fetch("/api/studio/process", { method: "POST", headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" }, body: JSON.stringify({ retryJobId: jobId }) });
+    const payload = (await response.json()) as { error?: string };
+    if (!response.ok) { notify(payload.error || "Relance impossible"); return; }
+    setFailedJobs((jobs) => jobs.filter((job) => job.id !== jobId));
+    notify("Traitement relancé — il continuera même si vous fermez ClipScale");
   };
   const exportClip = async (clip: ClipItem) => {
     setClipExporting(clip.id);
@@ -3804,6 +3820,18 @@ function AppShell({
                   ✦ Nouvelle analyse
                 </button>
               </div>
+              {failedJobs.length > 0 && (
+                <div className="cs15-failed-jobs" role="status">
+                  <div><b>Certains traitements nécessitent votre attention</b><span>Les crédits ont été restitués après l’échec. Vous pouvez relancer jusqu’à la limite indiquée.</span></div>
+                  {failedJobs.map((job) => (
+                    <article key={job.id}>
+                      <span>{job.error_message || "Traitement interrompu"}</span>
+                      <small>Tentative {job.attempts}/{job.max_attempts}</small>
+                      <button onClick={() => void retryProcessingJob(job.id)} disabled={job.attempts >= job.max_attempts}>{job.attempts >= job.max_attempts ? "Limite atteinte" : "Relancer"}</button>
+                    </article>
+                  ))}
+                </div>
+              )}
               <div className="cs8-clip-summary">
                 <article>
                   <span>Score moyen</span>
