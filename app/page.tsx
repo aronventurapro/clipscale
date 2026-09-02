@@ -10,7 +10,7 @@ import "./clipscale-v13.css";
 import "./clipscale-premium.css";
 
 type View = "overview" | "missions" | "clips" | "virality" | "scripts" | "publish" | "team" | "messages" | "billing" | "admin" | "settings";
-type MissionStatus = "En production" | "À valider" | "Planifiée";
+type MissionStatus = "En production" | "À valider" | "Planifiée" | "Terminée";
 type VideoMeta = { name: string; duration: number; width: number; height: number; size: number };
 type ViralAnalysis = { score: number; verdict: string; summary: string; factors: { label: string; score: number; detail: string }[]; improvements: string[]; strengths: string[]; retention: number; confidence: number; run: number };
 type ClipItem = { id: string; videoId: string; title: string; mission: string; format: string; status: "Montage" | "À valider" | "Approuvé" | "Publié"; score: number; retention: number; tone: string; start: number; end: number; version?: number; framingX?: number; framingY?: number; style?: string; aspectRatio?: string; zoomEnabled?: boolean; silenceRemoval?: boolean; captionStyle?: Record<string, unknown> };
@@ -41,11 +41,7 @@ function SocialIcon({ platform }: { platform: SocialPlatform }) {
   return <span className={`cs2-social-icon ${platform.tone}`} aria-hidden="true"><Icon /></span>;
 }
 
-const initialMissions = [
-  { id: 1, client: "Nova Studio", title: "Podcast Fondateurs #12", clips: "7 / 12", due: "Aujourd’hui", status: "À valider" as MissionStatus, tone: "violet" },
-  { id: 2, client: "Maison Lune", title: "Lancement collection été", clips: "10 / 18", due: "22 août", status: "En production" as MissionStatus, tone: "blue" },
-  { id: 3, client: "Growth Notes", title: "Interview — série acquisition", clips: "0 / 8", due: "26 août", status: "Planifiée" as MissionStatus, tone: "orange" },
-];
+type MissionItem = { id: string; client: string; title: string; clips: string; due: string; status: MissionStatus; tone: string };
 
 const initialClips = [
   { id: "sample-1", videoId: "sample", title: "Le déclic qui a tout changé", mission: "Podcast Fondateurs #12", format: "9:16 · 42 s", status: "À valider", score: 86, retention: 71, tone: "violet", start: 0, end: 42 },
@@ -295,7 +291,11 @@ function ClipperWorkspace({ userName, signOut, changeRole }: { userName: string;
 
 function AppShell({ exit, plan, userId, userEmail, userName, signOut, theme, toggleTheme }: { exit: () => void; plan: string; userId: string; userEmail: string | null; userName: string; signOut: () => void; theme: "dark" | "light"; toggleTheme: () => void }) {
   const [view, setView] = useState<View>("overview");
-  const [missions, setMissions] = useState<typeof initialMissions>([]);
+  const [missions, setMissions] = useState<MissionItem[]>([]);
+  const [missionTitle, setMissionTitle] = useState("");
+  const [missionClient, setMissionClient] = useState("");
+  const [missionTarget, setMissionTarget] = useState(6);
+  const [missionDue, setMissionDue] = useState("");
   const [clips, setClips] = useState<ClipItem[]>([]);
   const [showCreate, setShowCreate] = useState(false);
   const [toast, setToast] = useState("");
@@ -347,6 +347,9 @@ function AppShell({ exit, plan, userId, userEmail, userName, signOut, theme, tog
   const [grantSaving, setGrantSaving] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [passwordSaving, setPasswordSaving] = useState(false);
+  const [workspaceName, setWorkspaceName] = useState("ClipScale Studio");
+  const [contactEmail, setContactEmail] = useState(userEmail || "");
+  const [workspaceTimezone, setWorkspaceTimezone] = useState("Europe/Paris");
   const [accountOpen, setAccountOpen] = useState(false);
   const [editorClip, setEditorClip] = useState<ClipItem | null>(null);
   const [editorDraft, setEditorDraft] = useState<ClipDraft | null>(null);
@@ -377,6 +380,14 @@ function AppShell({ exit, plan, userId, userEmail, userName, signOut, theme, tog
     }, 0);
     return () => window.clearTimeout(timer);
   }, [userId]);
+  const loadMissions = useCallback(async () => {
+    if (!userId) return;
+    const { data, error } = await supabase.from("missions").select("id,client_name,title,target_clips,completed_clips,due_date,status").order("created_at", { ascending: false });
+    if (error) { notify("Les missions n’ont pas pu être chargées"); return; }
+    const statusLabels: Record<string, MissionStatus> = { planned: "Planifiée", active: "En production", review: "À valider", completed: "Terminée", archived: "Terminée" };
+    setMissions((data ?? []).map((item, index) => ({ id: item.id, client: item.client_name, title: item.title, clips: `${item.completed_clips} / ${item.target_clips}`, due: item.due_date ? new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short" }).format(new Date(`${item.due_date}T12:00:00`)) : "À définir", status: statusLabels[item.status] || "Planifiée", tone: ["violet", "blue", "orange", "green"][index % 4] })));
+  }, [userId]);
+  useEffect(() => { const timer = window.setTimeout(() => void loadMissions(), 0); return () => window.clearTimeout(timer); }, [loadMissions]);
   const loadStudioClips = useCallback(async () => {
     if (!userId) return;
     const { data, error } = await supabase.from("studio_clips").select("id,video_id,title,start_seconds,end_seconds,status,score,retention,edit_version,framing_x,framing_y,edit_style,aspect_ratio,zoom_enabled,silence_removal,caption_style,studio_videos(filename,width,height)").order("created_at", { ascending: false });
@@ -450,6 +461,18 @@ function AppShell({ exit, plan, userId, userEmail, userName, signOut, theme, tog
     if (error) { notify("Mot de passe non modifié"); return; }
     setNewPassword(""); notify("Mot de passe sécurisé et mis à jour");
   };
+  useEffect(() => {
+    if (!userId) return;
+    void supabase.from("workspace_settings").select("workspace_name,contact_email,timezone").eq("user_id", userId).maybeSingle().then(({ data }) => {
+      if (!data) return;
+      setWorkspaceName(data.workspace_name); setContactEmail(data.contact_email || userEmail || ""); setWorkspaceTimezone(data.timezone);
+    });
+  }, [userEmail, userId]);
+  const saveWorkspaceSettings = async () => {
+    if (workspaceName.trim().length < 2 || !contactEmail.includes("@")) { notify("Vérifiez le nom et l’adresse de contact"); return; }
+    const { error } = await supabase.from("workspace_settings").upsert({ user_id: userId, workspace_name: workspaceName.trim(), contact_email: contactEmail.trim().toLowerCase(), timezone: workspaceTimezone, updated_at: new Date().toISOString() });
+    notify(error ? "Réglages non enregistrés" : "Réglages enregistrés dans votre espace");
+  };
   const generateScript = () => {
     const mainKeyword = scriptKeywords.split(",")[0]?.trim() || scriptTopic;
     setGeneratedScript({
@@ -469,7 +492,12 @@ function AppShell({ exit, plan, userId, userEmail, userName, signOut, theme, tog
     notify("Script personnalisé généré");
   };
   const changeView = (next: View) => { setView(next); setShowCreate(false); setAccountOpen(false); if (userId) window.localStorage.setItem(`clipscale-view-${userId}`, next); };
-  const addMission = () => { setMissions((current) => [...current, { id: Date.now(), client: "Nouveau client", title: "Nouvelle mission", clips: "0 / 6", due: "À définir", status: "Planifiée", tone: "green" }]); setShowCreate(false); setView("missions"); notify(isDemo ? "Mission ajoutée à votre session d’essai" : "Mission créée dans votre espace"); };
+  const addMission = async () => {
+    if (!missionTitle.trim() || !missionClient.trim() || missionTarget < 1) { notify("Complétez le nom, le client et le nombre de clips"); return; }
+    const { error } = await supabase.from("missions").insert({ user_id: userId, client_name: missionClient.trim(), title: missionTitle.trim(), target_clips: missionTarget, due_date: missionDue || null, status: "planned" });
+    if (error) { notify("La mission n’a pas pu être enregistrée"); return; }
+    setMissionTitle(""); setMissionClient(""); setMissionTarget(6); setMissionDue(""); setShowCreate(false); setView("missions"); await loadMissions(); notify("Mission enregistrée dans votre espace");
+  };
   const advanceClip = async (id: string) => {
     const current = clips.find((clip) => clip.id === id); if (!current) return;
     const status = current.status === "Montage" ? "À valider" : current.status === "À valider" ? "Approuvé" : current.status === "Approuvé" ? "Publié" : current.status;
@@ -885,7 +913,7 @@ function AppShell({ exit, plan, userId, userEmail, userName, signOut, theme, tog
           {view === "settings" && <>
             <div className="cs2-page-title"><div><span>ESPACE</span><h1>Réglages</h1><p>Configurez les informations principales de votre agence.</p></div></div>
             <div className="cs2-subscription-card"><div><span>{isAdmin ? "COMPTE PROPRIÉTAIRE · ACCÈS COMPLET" : complimentaryAccess ? "ACCÈS OFFERT PAR L’ADMINISTRATEUR" : userId ? "ABONNEMENT ACTIF" : "APERÇU INTERACTIF"}</span><h2>Plan {isAdmin || complimentaryAccess ? "Agency" : plan}</h2><p>{isAdmin || complimentaryAccess ? "Toutes les fonctionnalités Agency sont débloquées sur ce compte." : "Statistiques avancées, publication multicanale et analyse virale incluses."}</p></div><div><b>{isAdmin || complimentaryAccess ? "Complet" : isDemo ? "Gratuit" : `${plans.find((item) => item.name === plan)?.price ?? 79}€`} <small>{isAdmin ? "compte propriétaire" : complimentaryAccess ? "accès offert" : isDemo ? "aperçu" : "/ mois HT"}</small></b><button onClick={exit}>Voir le site public</button></div></div>
-            <div className="cs2-panel cs2-settings"><h2>Informations de l’agence</h2><label>Nom de l’espace<input defaultValue="ClipScale Studio" /></label><label>Email de contact<input type="email" defaultValue={userEmail || "bonjour@clipscale.app"} /></label><label>Fuseau horaire<select defaultValue="Europe/Paris"><option>Europe/Paris</option><option>America/New_York</option></select></label><button className="cs2-button" onClick={() => notify("Réglages enregistrés")}>Enregistrer</button></div>
+            <div className="cs2-panel cs2-settings"><h2>Informations de l’agence</h2><label>Nom de l’espace<input value={workspaceName} onChange={(event) => setWorkspaceName(event.target.value)} maxLength={100} /></label><label>Email de contact<input type="email" value={contactEmail} onChange={(event) => setContactEmail(event.target.value)} maxLength={320} /></label><label>Fuseau horaire<select value={workspaceTimezone} onChange={(event) => setWorkspaceTimezone(event.target.value)}><option>Europe/Paris</option><option>America/New_York</option></select></label><button className="cs2-button" onClick={() => void saveWorkspaceSettings()}>Enregistrer</button></div>
             <div className="cs2-panel cs13-referral"><div><span>ACQUISITION</span><h2>Programme ambassadeur</h2><p>Invitez une agence ou un clippeur avec votre lien personnel. Les récompenses seront créditées après l’activation des paiements.</p></div><div><small>VOTRE CODE</small><strong>CLIP-{initials}</strong><button onClick={() => navigator.clipboard?.writeText(`${window.location.origin}/?ref=CLIP-${initials}`).then(() => notify("Lien de parrainage copié"))}>Copier le lien →</button></div></div>
             {userId && <div className="cs2-panel cs2-settings"><h2>Sécurité du compte</h2><p className="cs2-settings-copy">Modifiez votre mot de passe directement, sans nouvelle validation par e-mail.</p><label>Nouveau mot de passe<input type="password" minLength={12} value={newPassword} onChange={(event) => setNewPassword(event.target.value)} autoComplete="new-password" placeholder="12 caractères minimum" /></label><button className="cs2-button" disabled={passwordSaving || newPassword.length < 12} onClick={updatePassword}>{passwordSaving ? "Mise à jour…" : "Changer mon mot de passe"}</button></div>}
             {userId && <button className="cs4-signout" onClick={signOut}>Se déconnecter</button>}
@@ -893,7 +921,7 @@ function AppShell({ exit, plan, userId, userEmail, userName, signOut, theme, tog
         </section>
       </main>
 
-      {showCreate && <div className="cs2-modal-backdrop" role="presentation" onMouseDown={(event) => event.currentTarget === event.target && setShowCreate(false)}><div className="cs2-modal" role="dialog" aria-modal="true" aria-labelledby="new-mission-title"><button className="cs2-modal-close" onClick={() => setShowCreate(false)} aria-label="Fermer">×</button><span>NOUVELLE MISSION</span><h2 id="new-mission-title">Que faut-il produire ?</h2><p>Créez la structure de la mission. Vous pourrez compléter le brief ensuite.</p><label>Nom de la mission<input autoFocus placeholder="Ex. Podcast Fondateurs #13" /></label><div className="cs2-form-row"><label>Client<input placeholder="Nom du client" /></label><label>Nombre de clips<input type="number" min="1" defaultValue="6" /></label></div><label>Échéance<input type="date" /></label><div className="cs2-modal-actions"><button onClick={() => setShowCreate(false)}>Annuler</button><button className="cs2-button" onClick={addMission}>Créer la mission</button></div></div></div>}
+      {showCreate && <div className="cs2-modal-backdrop" role="presentation" onMouseDown={(event) => event.currentTarget === event.target && setShowCreate(false)}><div className="cs2-modal" role="dialog" aria-modal="true" aria-labelledby="new-mission-title"><button className="cs2-modal-close" onClick={() => setShowCreate(false)} aria-label="Fermer">×</button><span>NOUVELLE MISSION</span><h2 id="new-mission-title">Que faut-il produire ?</h2><p>Créez la structure de la mission. Elle restera synchronisée avec votre compte.</p><label>Nom de la mission<input autoFocus value={missionTitle} onChange={(event) => setMissionTitle(event.target.value)} maxLength={120} placeholder="Ex. Podcast Fondateurs #13" /></label><div className="cs2-form-row"><label>Client<input value={missionClient} onChange={(event) => setMissionClient(event.target.value)} maxLength={100} placeholder="Nom du client" /></label><label>Nombre de clips<input type="number" min="1" max="10000" value={missionTarget} onChange={(event) => setMissionTarget(Number(event.target.value))} /></label></div><label>Échéance<input type="date" value={missionDue} onChange={(event) => setMissionDue(event.target.value)} /></label><div className="cs2-modal-actions"><button onClick={() => setShowCreate(false)}>Annuler</button><button className="cs2-button" onClick={() => void addMission()}>Créer la mission</button></div></div></div>}
       {showConnect && <div className="cs2-modal-backdrop" role="presentation" onMouseDown={(event) => event.currentTarget === event.target && setShowConnect(false)}><div className="cs2-modal cs2-connect-modal" role="dialog" aria-modal="true" aria-labelledby="connect-title"><button className="cs2-modal-close" onClick={() => setShowConnect(false)} aria-label="Fermer">×</button><span>DERNIÈRE ÉTAPE</span><h2 id="connect-title">Connectez vos comptes</h2><p>La publication est prête. Pour envoyer réellement la vidéo, autorisez chaque réseau avec sa fenêtre officielle.</p><div className="cs2-connect-list">{socialPlatforms.filter((item) => selectedPlatforms.includes(item.id)).map((item) => <div key={item.id}><SocialIcon platform={item} /><b>{item.name}</b><small>À connecter</small></div>)}</div><div className="cs2-connect-security"><span>✓</span><p><b>Connexion OAuth sécurisée</b><br />Vos identifiants restent chez Instagram, TikTok, Google, Meta et les autres plateformes.</p></div><div className="cs2-modal-actions"><button onClick={() => setShowConnect(false)}>Revenir au brouillon</button><button className="cs2-button" onClick={() => notify("Intégration des comptes prête à être configurée")}>Configurer les connexions</button></div></div></div>}
       {editorClip && editorDraft && <div className="cs2-modal-backdrop cs17-editor-backdrop" role="presentation"><div className="cs17-editor" role="dialog" aria-modal="true" aria-labelledby="editor-title"><header><div><span>ÉDITEUR CLIPSCALE</span><h2 id="editor-title">Montage et sous-titres</h2></div><div><button onClick={undoEditor} disabled={!editorUndo.length} aria-label="Annuler">↶</button><button onClick={redoEditor} disabled={!editorRedo.length} aria-label="Rétablir">↷</button><button onClick={() => { setEditorClip(null); setEditorDraft(null); setEditorVideoUrl(""); }} aria-label="Fermer">×</button></div></header><div className="cs17-editor-grid"><section className={`cs17-preview ratio-${editorDraft.aspectRatio.replace(":", "-")}`}>{editorVideoUrl ? <video src={`${editorVideoUrl}#t=${editorDraft.start},${editorDraft.end}`} controls playsInline /> : <div>Chargement de la source…</div>}<strong style={{ color: editorDraft.captionColor, fontSize: `${Math.max(18, editorDraft.fontSize / 2)}px` }}><em style={{ color: editorDraft.activeColor }}>MOT IMPORTANT</em><br />sous-titres dynamiques</strong></section><section className="cs17-controls"><label>Titre<input value={editorDraft.title} onChange={(e) => changeEditorDraft({ title: e.target.value })} maxLength={120}/></label><div className="cs17-time-row"><label>Début<input type="number" min="0" step="0.1" value={editorDraft.start} onChange={(e) => changeEditorDraft({ start: Number(e.target.value) })}/></label><label>Fin<input type="number" min={editorDraft.start + 1} step="0.1" value={editorDraft.end} onChange={(e) => changeEditorDraft({ end: Number(e.target.value) })}/></label></div><div className="cs17-timeline"><span style={{ width: `${Math.min(100, Math.max(2, (editorDraft.end - editorDraft.start) / Math.max(editorDraft.end, 1) * 100))}%` }}/><small>{editorDraft.start.toFixed(1)} s → {editorDraft.end.toFixed(1)} s</small></div><div className="cs17-time-row"><label>Format<select value={editorDraft.aspectRatio} onChange={(e) => changeEditorDraft({ aspectRatio: e.target.value })}><option>9:16</option><option>1:1</option><option>4:5</option><option>16:9</option></select></label><label>Style<select value={editorDraft.style} onChange={(e) => changeEditorDraft({ style: e.target.value })}><option value="clean">Sobre</option><option value="podcast">Podcast</option><option value="storytelling">Storytelling</option><option value="dynamic">Énergique</option><option value="premium">Premium</option></select></label></div><label>Cadrage horizontal<input type="range" min="-1" max="1" step="0.05" value={editorDraft.framingX} onChange={(e) => changeEditorDraft({ framingX: Number(e.target.value) })}/></label><label>Cadrage vertical<input type="range" min="-1" max="1" step="0.05" value={editorDraft.framingY} onChange={(e) => changeEditorDraft({ framingY: Number(e.target.value) })}/></label><div className="cs17-time-row"><label>Texte<input type="color" value={editorDraft.captionColor} onChange={(e) => changeEditorDraft({ captionColor: e.target.value })}/></label><label>Mot actif<input type="color" value={editorDraft.activeColor} onChange={(e) => changeEditorDraft({ activeColor: e.target.value })}/></label></div><label>Taille des sous-titres<input type="range" min="24" max="96" value={editorDraft.fontSize} onChange={(e) => changeEditorDraft({ fontSize: Number(e.target.value) })}/></label><label className="cs17-check"><input type="checkbox" checked={editorDraft.zoomEnabled} onChange={(e) => changeEditorDraft({ zoomEnabled: e.target.checked })}/> Zoom automatique</label><label className="cs17-check"><input type="checkbox" checked={editorDraft.silenceRemoval} onChange={(e) => changeEditorDraft({ silenceRemoval: e.target.checked })}/> Repérer les silences à couper</label></section></div><footer><small>Sauvegarde versionnée · historique conservé</small><button onClick={() => { setEditorClip(null); setEditorDraft(null); }}>Annuler</button><button className="cs2-button" onClick={() => void saveClipEditor()} disabled={editorSaving}>{editorSaving ? "Sauvegarde…" : "Sauvegarder le montage"}</button></footer></div></div>}
       <button className="cs4-support-fab" onClick={() => setShowSupport(true)} aria-label="Ouvrir le support"><span>?</span><b>Support</b></button>

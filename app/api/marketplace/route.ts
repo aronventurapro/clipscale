@@ -1,8 +1,13 @@
-import { ensureMarketplaceSchema, marketplaceDb } from "../../../lib/marketplace-db";
+import { createClient } from "@supabase/supabase-js";
 
-export const dynamic="force-dynamic";
-export async function GET(){
- await ensureMarketplaceSchema();
- const result=await (await marketplaceDb()).prepare(`SELECT o.id,o.title,o.client_name as clientName,o.description,o.platforms,o.budget_cents as budgetCents,o.cpm_cents as cpmCents,o.status,o.created_at as createdAt,COUNT(a.id) as applicationCount FROM offers o LEFT JOIN applications a ON a.offer_id=o.id WHERE o.status='open' GROUP BY o.id ORDER BY o.created_at DESC LIMIT 100`).all();
- return Response.json({offers:result.results},{headers:{"Cache-Control":"no-store"}});
+export const dynamic = "force-dynamic";
+const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://rtnkxqoenakebgeuittq.supabase.co";
+const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? "sb_publishable_se9rZq3CDLxGU1T8iAGwdA_HpL-7z6Q";
+
+export async function GET() {
+  const db = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  const { data, error } = await db.from("marketplace_offers").select("id,title,client_name,description,platforms,budget_cents,cpm_cents,status,created_at,marketplace_applications(count)").eq("status", "open").order("created_at", { ascending: false }).limit(100);
+  if (error) return Response.json({ error: "Marketplace indisponible" }, { status: 503, headers: { "Cache-Control": "no-store" } });
+  const offers = (data ?? []).map((row) => ({ id: row.id, title: row.title, clientName: row.client_name, description: row.description, platforms: row.platforms, budgetCents: row.budget_cents, cpmCents: row.cpm_cents, status: row.status, createdAt: row.created_at, applicationCount: Array.isArray(row.marketplace_applications) ? Number(row.marketplace_applications[0]?.count || 0) : 0 }));
+  return Response.json({ offers }, { headers: { "Cache-Control": "no-store" } });
 }
