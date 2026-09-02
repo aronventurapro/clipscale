@@ -1,7 +1,9 @@
 import { chatGPTSignInPath, getChatGPTUser } from "../../chatgpt-auth";
 import { cleanText, ensureMarketplaceSchema, marketplaceDb, validUrl } from "../../../lib/marketplace-db";
+import { bodyWithinLimit, jsonError } from "../../../lib/server-security";
 
 export async function POST(request:Request){
+ if(!bodyWithinLimit(request,16_384))return jsonError("Requête trop volumineuse",413);
  const user=await getChatGPTUser();
  if(!user)return Response.json({error:"Connexion requise",signIn:chatGPTSignInPath("/marketplace")},{status:401});
  const body=await request.json().catch(()=>({}));

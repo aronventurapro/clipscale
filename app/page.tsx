@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, ty
 import Image from "next/image";
 import { SiBluesky, SiFacebook, SiInstagram, SiLinkedin, SiPinterest, SiSnapchat, SiTelegram, SiThreads, SiTiktok, SiYoutube } from "react-icons/si";
 import { supabase } from "../lib/supabase";
+import { uploadVideoResumable } from "../lib/resumable-upload";
 import "./clipscale-v2.css";
 import "./clipscale-v13.css";
 import "./clipscale-premium.css";
@@ -12,7 +13,8 @@ type View = "overview" | "missions" | "clips" | "virality" | "scripts" | "publis
 type MissionStatus = "En production" | "À valider" | "Planifiée";
 type VideoMeta = { name: string; duration: number; width: number; height: number; size: number };
 type ViralAnalysis = { score: number; verdict: string; summary: string; factors: { label: string; score: number; detail: string }[]; improvements: string[]; strengths: string[]; retention: number; confidence: number; run: number };
-type ClipItem = { id: string; videoId: string; title: string; mission: string; format: string; status: "Montage" | "À valider" | "Approuvé" | "Publié"; score: number; retention: number; tone: string; start: number; end: number };
+type ClipItem = { id: string; videoId: string; title: string; mission: string; format: string; status: "Montage" | "À valider" | "Approuvé" | "Publié"; score: number; retention: number; tone: string; start: number; end: number; version?: number; framingX?: number; framingY?: number; style?: string; aspectRatio?: string; zoomEnabled?: boolean; silenceRemoval?: boolean; captionStyle?: Record<string, unknown> };
+type ClipDraft = { title: string; start: number; end: number; framingX: number; framingY: number; style: string; aspectRatio: string; zoomEnabled: boolean; silenceRemoval: boolean; captionColor: string; activeColor: string; fontSize: number };
 type AccessGrant = { id: string; email: string; active: boolean; access_level: "starter" | "scale" | "agency"; note: string | null; created_at: string };
 type SocialPlatform = { id: string; name: string; short: string; tone: string; format: string; ratio: string; recommendedLength: number; tips: string[] };
 type AccountRole = "Agence" | "Créateur" | "Clippeur";
@@ -259,7 +261,12 @@ function AuthModal({ plan, close, authenticated, initialMode }: { plan: string; 
     }
     setLoading(false);
   };
-  return <div className="cs2-modal-backdrop cs4-auth-backdrop" role="presentation" onMouseDown={(event) => event.currentTarget === event.target && close()}><div className="cs4-auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-title"><button className="cs2-modal-close" onClick={close} aria-label="Fermer">×</button><Logo/><span>{mode === "signup" ? `ESSAI ${plan} · 14 JOURS` : mode === "signin" ? "BON RETOUR" : "ACCÈS AU COMPTE"}</span><h2 id="auth-title">{mode === "signup" ? "Créez votre cockpit." : mode === "signin" ? "Connectez-vous à ClipScale." : "Réinitialisez votre accès."}</h2><p>{mode === "signup" ? "Aucun paiement maintenant. Votre espace sécurisé est créé immédiatement." : "Retrouvez vos vidéos, publications et statistiques."}</p>{mode === "signup" && <div className="cs4-auth-row"><label>Votre nom<input value={fullName} onChange={(e) => setFullName(e.target.value)} autoComplete="name" placeholder="Arno Ventura" /></label><label>Nom de l’espace<input value={workspaceName} onChange={(e) => setWorkspaceName(e.target.value)} placeholder="Mon agence" /></label></div>}<label>Email professionnel<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" placeholder="vous@entreprise.com" /></label>{mode !== "reset" && <label>Mot de passe<input type="password" minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={mode === "signup" ? "new-password" : "current-password"} placeholder="8 caractères minimum" /></label>}<button className="cs2-button cs4-auth-submit" onClick={submit} disabled={loading || !email || (mode !== "reset" && password.length < 8)}>{loading ? "Un instant…" : mode === "signup" ? "Créer mon espace →" : mode === "signin" ? "Se connecter →" : "Envoyer le lien →"}</button>{feedback && <div className="cs4-auth-feedback" role="status">{feedback}</div>}<div className="cs4-auth-switch">{mode === "signup" ? <button onClick={() => setMode("signin")}>Déjà inscrit ? Se connecter</button> : <button onClick={() => setMode("signup")}>Créer un compte</button>}{mode === "signin" && <button onClick={() => setMode("reset")}>Mot de passe oublié ?</button>}</div><small>En continuant, vous acceptez les conditions et la politique de confidentialité.</small></div></div>;
+  const signInWithGoogle = async () => {
+    setFeedback(""); setLoading(true);
+    const { error } = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin } });
+    if (error) { setFeedback("Connexion Google indisponible. Réessayez dans quelques instants."); setLoading(false); }
+  };
+  return <div className="cs2-modal-backdrop cs4-auth-backdrop" role="presentation" onMouseDown={(event) => event.currentTarget === event.target && close()}><div className="cs4-auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-title"><button className="cs2-modal-close" onClick={close} aria-label="Fermer">×</button><Logo/><span>{mode === "signup" ? `ESSAI ${plan} · 14 JOURS` : mode === "signin" ? "BON RETOUR" : "ACCÈS AU COMPTE"}</span><h2 id="auth-title">{mode === "signup" ? "Créez votre cockpit." : mode === "signin" ? "Connectez-vous à ClipScale." : "Réinitialisez votre accès."}</h2><p>{mode === "signup" ? "Aucun paiement maintenant. Votre espace sécurisé est créé immédiatement." : "Retrouvez vos vidéos, publications et statistiques."}</p>{mode !== "reset" && <><button type="button" className="cs4-google-auth" onClick={signInWithGoogle} disabled={loading}><span aria-hidden="true">G</span>{loading ? "Connexion…" : "Continuer avec Google"}</button><div className="cs4-auth-divider"><span>ou avec votre email</span></div></>}{mode === "signup" && <div className="cs4-auth-row"><label>Votre nom<input value={fullName} onChange={(e) => setFullName(e.target.value)} autoComplete="name" placeholder="Arno Ventura" /></label><label>Nom de l’espace<input value={workspaceName} onChange={(e) => setWorkspaceName(e.target.value)} placeholder="Mon agence" /></label></div>}<label>Email professionnel<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" placeholder="vous@entreprise.com" /></label>{mode !== "reset" && <label>Mot de passe<input type="password" minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={mode === "signup" ? "new-password" : "current-password"} placeholder="8 caractères minimum" /></label>}<button className="cs2-button cs4-auth-submit" onClick={submit} disabled={loading || !email || (mode !== "reset" && password.length < 8)}>{loading ? "Un instant…" : mode === "signup" ? "Créer mon espace →" : mode === "signin" ? "Se connecter →" : "Envoyer le lien →"}</button>{feedback && <div className="cs4-auth-feedback" role="status">{feedback}</div>}<div className="cs4-auth-switch">{mode === "signup" ? <button onClick={() => setMode("signin")}>Déjà inscrit ? Se connecter</button> : <button onClick={() => setMode("signup")}>Créer un compte</button>}{mode === "signin" && <button onClick={() => setMode("reset")}>Mot de passe oublié ?</button>}</div><small>En continuant, vous acceptez les conditions et la politique de confidentialité.</small></div></div>;
 }
 
 function Onboarding({ userId, plan, done }: { userId: string; plan: string; done: (role: AccountRole) => void }) {
@@ -304,6 +311,8 @@ function AppShell({ exit, plan, userId, userEmail, userName, signOut, theme, tog
   const [hook, setHook] = useState("");
   const [analysis, setAnalysis] = useState<ViralAnalysis | null>(null);
   const [analysisRun, setAnalysisRun] = useState(0);
+  const [analysisProvider, setAnalysisProvider] = useState<"openai" | "local" | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [publishUrl, setPublishUrl] = useState("");
   const [publishFileName, setPublishFileName] = useState("");
   const [publishVideoMeta, setPublishVideoMeta] = useState<VideoMeta | null>(null);
@@ -339,6 +348,13 @@ function AppShell({ exit, plan, userId, userEmail, userName, signOut, theme, tog
   const [newPassword, setNewPassword] = useState("");
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
+  const [editorClip, setEditorClip] = useState<ClipItem | null>(null);
+  const [editorDraft, setEditorDraft] = useState<ClipDraft | null>(null);
+  const [editorUndo, setEditorUndo] = useState<ClipDraft[]>([]);
+  const [editorRedo, setEditorRedo] = useState<ClipDraft[]>([]);
+  const [editorVideoUrl, setEditorVideoUrl] = useState("");
+  const [editorSaving, setEditorSaving] = useState(false);
+  const [videoUploadProgress, setVideoUploadProgress] = useState(0);
   const toastTimer = useRef<number | null>(null);
   const isDemo = false;
   const displayName = userName.trim() || userEmail?.split("@")[0] || "Aron Ventura";
@@ -363,16 +379,36 @@ function AppShell({ exit, plan, userId, userEmail, userName, signOut, theme, tog
   }, [userId]);
   const loadStudioClips = useCallback(async () => {
     if (!userId) return;
-    const { data, error } = await supabase.from("studio_clips").select("id,video_id,title,start_seconds,end_seconds,status,score,retention,studio_videos(filename,width,height)").order("created_at", { ascending: false });
+    const { data, error } = await supabase.from("studio_clips").select("id,video_id,title,start_seconds,end_seconds,status,score,retention,edit_version,framing_x,framing_y,edit_style,aspect_ratio,zoom_enabled,silence_removal,caption_style,studio_videos(filename,width,height)").order("created_at", { ascending: false });
     if (error || !data) return;
-    setClips(data.map((row: any, index: number) => {
+    setClips(data.map((row: { id: string; video_id: string; title: string; start_seconds: number; end_seconds: number; status: ClipItem["status"]; score: number; retention: number; edit_version?: number; framing_x?: number; framing_y?: number; edit_style?: string; aspect_ratio?: string; zoom_enabled?: boolean; silence_removal?: boolean; caption_style?: Record<string, unknown>; studio_videos: { filename?: string; width?: number; height?: number } | { filename?: string; width?: number; height?: number }[] | null }, index: number) => {
       const source = Array.isArray(row.studio_videos) ? row.studio_videos[0] : row.studio_videos;
       const duration = Math.max(1, Math.round(Number(row.end_seconds) - Number(row.start_seconds)));
       const vertical = Number(source?.height || 0) > Number(source?.width || 0);
-      return { id: row.id, videoId: row.video_id, title: row.title, mission: source?.filename || "Vidéo importée", format: `${vertical ? "9:16" : "Source"} · ${duration} s`, status: row.status, score: row.score, retention: row.retention, tone: ["violet","blue","orange","green"][index % 4], start: Number(row.start_seconds), end: Number(row.end_seconds) } as ClipItem;
+      return { id: row.id, videoId: row.video_id, title: row.title, mission: source?.filename || "Vidéo importée", format: `${row.aspect_ratio || (vertical ? "9:16" : "Source")} · ${duration} s`, status: row.status, score: row.score, retention: row.retention, tone: ["violet","blue","orange","green"][index % 4], start: Number(row.start_seconds), end: Number(row.end_seconds), version: row.edit_version || 1, framingX: Number(row.framing_x) || 0, framingY: Number(row.framing_y) || 0, style: row.edit_style || "dynamic", aspectRatio: row.aspect_ratio || "9:16", zoomEnabled: row.zoom_enabled ?? true, silenceRemoval: row.silence_removal ?? false, captionStyle: row.caption_style || {} } as ClipItem;
     }));
   }, [userId]);
-  useEffect(() => { void loadStudioClips(); }, [loadStudioClips]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void loadStudioClips(); }, 0);
+    return () => window.clearTimeout(timer);
+  }, [loadStudioClips]);
+  useEffect(() => {
+    if (!userId) return;
+    let active = true;
+    const resume = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token || !active) return;
+      const { data: jobs } = await supabase.from("processing_jobs").select("id,job_type,status").in("status", ["queued", "processing"]).order("created_at", { ascending: false }).limit(5);
+      for (const job of jobs || []) {
+        if (job.job_type !== "transcribe" && job.job_type !== "analyse") continue;
+        const response = await fetch(`/api/studio/process?jobId=${encodeURIComponent(job.id)}`, { headers: { Authorization: `Bearer ${session.access_token}` }, cache: "no-store" });
+        const payload = await response.json() as { status?: string; output?: { count?: number } };
+        if (response.ok && payload.status === "completed") { await loadStudioClips(); notify(`${payload.output?.count || 0} clips terminés automatiquement`); }
+      }
+    };
+    void resume(); const timer = window.setInterval(() => void resume(), 12_000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, [loadStudioClips, userId]);
   const loadAccess = useCallback(async () => {
     const normalizedEmail = userEmail?.trim().toLowerCase();
     if (!userId || !normalizedEmail) { setIsAdmin(false); setComplimentaryAccess(null); setAccessGrants([]); return; }
@@ -443,14 +479,38 @@ function AppShell({ exit, plan, userId, userEmail, userName, signOut, theme, tog
     if (error) { setClips((items) => items.map((clip) => clip.id === id ? current : clip)); notify("Le statut n’a pas pu être sauvegardé"); return; }
     notify("Statut du clip sauvegardé");
   };
+  const openClipEditor = async (clip: ClipItem) => {
+    const caption = clip.captionStyle || {};
+    const draft: ClipDraft = { title: clip.title, start: clip.start, end: clip.end, framingX: clip.framingX || 0, framingY: clip.framingY || 0, style: clip.style || "dynamic", aspectRatio: clip.aspectRatio || "9:16", zoomEnabled: clip.zoomEnabled ?? true, silenceRemoval: clip.silenceRemoval ?? false, captionColor: String(caption.color || "#FFFFFF"), activeColor: String(caption.activeColor || "#8A6CFF"), fontSize: Number(caption.fontSize) || 64 };
+    setEditorClip(clip); setEditorDraft(draft); setEditorUndo([]); setEditorRedo([]); setEditorVideoUrl("");
+    const { data: video } = await supabase.from("studio_videos").select("file_path").eq("id", clip.videoId).eq("user_id", userId).single();
+    if (video?.file_path) { const { data } = await supabase.storage.from("studio-videos").createSignedUrl(video.file_path, 900); if (data?.signedUrl) setEditorVideoUrl(data.signedUrl); }
+  };
+  const changeEditorDraft = (patch: Partial<ClipDraft>) => {
+    setEditorDraft((current) => { if (!current) return current; setEditorUndo((items) => [...items, current].slice(-30)); setEditorRedo([]); return { ...current, ...patch }; });
+  };
+  const undoEditor = () => { const previous = editorUndo.at(-1); if (!previous || !editorDraft) return; setEditorRedo((items) => [...items, editorDraft]); setEditorUndo((items) => items.slice(0, -1)); setEditorDraft(previous); };
+  const redoEditor = () => { const next = editorRedo.at(-1); if (!next || !editorDraft) return; setEditorUndo((items) => [...items, editorDraft]); setEditorRedo((items) => items.slice(0, -1)); setEditorDraft(next); };
+  const saveClipEditor = async () => {
+    if (!editorClip || !editorDraft) return; setEditorSaving(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    const response = await fetch(`/api/studio/clips/${editorClip.id}`, { method: "PATCH", headers: { Authorization: `Bearer ${session?.access_token || ""}`, "Content-Type": "application/json" }, body: JSON.stringify({ version: editorClip.version || 1, ...editorDraft, captionStyle: { color: editorDraft.captionColor, activeColor: editorDraft.activeColor, fontSize: editorDraft.fontSize } }) });
+    const payload = await response.json() as { error?: string }; setEditorSaving(false);
+    if (!response.ok) { notify(payload.error || "Sauvegarde impossible"); return; }
+    await loadStudioClips(); setEditorClip(null); setEditorDraft(null); setEditorVideoUrl(""); notify("Montage sauvegardé — nouveau rendu prêt");
+  };
   const selectVideo = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    const allowedVideoTypes = new Set(["video/mp4", "video/quicktime", "video/webm"]);
+    const allowedExtension = /\.(mp4|mov|webm)$/i.test(file.name);
+    if (!allowedVideoTypes.has(file.type) || !allowedExtension) { event.target.value = ""; notify("Format refusé : utilisez un fichier MP4, MOV ou WebM"); return; }
+    if (file.size < 1_024) { event.target.value = ""; notify("Le fichier vidéo est vide ou invalide"); return; }
     if (file.size > 500 * 1024 * 1024) { notify("La vidéo dépasse la limite de 500 Mo"); return; }
     if (videoUrl) URL.revokeObjectURL(videoUrl);
     const url = URL.createObjectURL(file);
     videoFileRef.current = file;
-    setVideoUrl(url); setVideoMeta(null); setVideoRecordId(null); setVideoUploadState("uploading"); setAnalysis(null);
+    setVideoUrl(url); setVideoMeta(null); setVideoRecordId(null); setVideoUploadState("uploading"); setVideoUploadProgress(0); setAnalysis(null);
     const probe = document.createElement("video");
     probe.preload = "metadata";
     probe.onerror = () => { setVideoUploadState("error"); notify("Impossible de lire cette vidéo"); };
@@ -459,8 +519,17 @@ function AppShell({ exit, plan, userId, userEmail, userName, signOut, theme, tog
       setVideoMeta(meta);
       const safeName = file.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9._-]/g, "-").slice(-100);
       const path = `${userId}/${crypto.randomUUID()}-${safeName}`;
-      const upload = await supabase.storage.from("studio-videos").upload(path, file, { contentType: file.type, upsert: false });
-      if (upload.error) { setVideoUploadState("error"); notify("La vidéo reste utilisable, mais sa sauvegarde a échoué"); return; }
+      let uploadError: unknown = null;
+      if (file.size > 6 * 1024 * 1024) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.access_token) uploadError = new Error("Session absente");
+        else try { await uploadVideoResumable(file, path, session.access_token, setVideoUploadProgress); } catch (error) { uploadError = error; }
+      } else {
+        const upload = await supabase.storage.from("studio-videos").upload(path, file, { contentType: file.type, upsert: false });
+        uploadError = upload.error;
+        if (!upload.error) setVideoUploadProgress(100);
+      }
+      if (uploadError) { setVideoUploadState("error"); notify("La vidéo reste utilisable, mais sa sauvegarde a échoué"); return; }
       const saved = await supabase.from("studio_videos").insert({ user_id: userId, file_path: path, filename: file.name, mime_type: file.type || "video/mp4", size_bytes: file.size, duration_seconds: meta.duration, width: meta.width, height: meta.height, platform, hook, status: "uploaded" }).select("id").single();
       if (saved.error) { await supabase.storage.from("studio-videos").remove([path]); setVideoUploadState("error"); notify("La fiche vidéo n’a pas pu être enregistrée"); return; }
       setVideoRecordId(saved.data.id); setVideoUploadState("ready"); notify("Vidéo sauvegardée dans votre espace sécurisé");
@@ -469,6 +538,7 @@ function AppShell({ exit, plan, userId, userEmail, userName, signOut, theme, tog
   };
   const analyzeVideo = async () => {
     if (!videoMeta) return;
+    setIsAnalyzing(true);
     const vertical = videoMeta.height > videoMeta.width;
     const durationPoints = videoMeta.duration >= 12 && videoMeta.duration <= 40 ? 25 : videoMeta.duration <= 60 ? 17 : 8;
     const formatPoints = vertical ? 22 : 8;
@@ -489,7 +559,7 @@ function AppShell({ exit, plan, userId, userEmail, userName, signOut, theme, tog
       hookLength < 18 ? "Renforcez les 2 premières secondes avec une promesse précise ou une phrase qui crée de la curiosité." : "Affichez votre accroche en sous-titre dès la première image.",
       "Terminez par une question simple pour provoquer les commentaires et les partages.",
     ];
-    const result: ViralAnalysis = {
+    let result: ViralAnalysis = {
       score,
       verdict: score >= 80 ? "Fort potentiel" : score >= 65 ? "Bon potentiel" : score >= 50 ? "Potentiel moyen" : "À retravailler",
       summary: score >= 80 ? `Ce clip possède une structure technique solide pour ${platform}. Son format et sa durée favorisent la rétention.` : `Le clip peut fonctionner sur ${platform}, mais quelques ajustements augmenteraient nettement ses chances de retenir l’audience.`,
@@ -509,31 +579,98 @@ function AppShell({ exit, plan, userId, userEmail, userName, signOut, theme, tog
       confidence: Math.max(68, Math.min(94, 78 + Math.round((qualityPoints + hookPoints) / 7))),
       run: nextRun,
     };
+    let provider: "openai" | "local" = "local";
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error("missing-session");
+      let frameDataUrl = "";
+      const video = analysisVideoRef.current;
+      if (video && video.videoWidth && video.videoHeight) {
+        const canvas = document.createElement("canvas");
+        const scale = Math.min(1, 768 / Math.max(video.videoWidth, video.videoHeight));
+        canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+        canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+        canvas.getContext("2d")?.drawImage(video, 0, 0, canvas.width, canvas.height);
+        frameDataUrl = canvas.toDataURL("image/jpeg", 0.72);
+      }
+      const response = await fetch("/api/studio/analyze", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ platform, hook, frameDataUrl, video: { filename: videoMeta.name, duration: videoMeta.duration, width: videoMeta.width, height: videoMeta.height } }),
+      });
+      const payload = await response.json() as { analysis?: Omit<ViralAnalysis, "run">; provider?: "openai"; error?: string };
+      if (!response.ok || !payload.analysis) throw new Error(payload.error || "analysis-failed");
+      result = { ...payload.analysis, run: nextRun };
+      provider = "openai";
+    } catch {
+      notify("OpenAI indisponible : diagnostic technique local utilisé");
+    }
     setAnalysis(result);
+    setAnalysisProvider(provider);
     setAnalysisRun(nextRun);
     if (videoRecordId) {
       const { error } = await supabase.from("studio_videos").update({ platform, hook, score: result.score, retention: result.retention, confidence: result.confidence, analysis: result, status: "analyzed", updated_at: new Date().toISOString() }).eq("id", videoRecordId).eq("user_id", userId);
-      if (error) notify("Analyse terminée, mais la sauvegarde a échoué"); else notify("Analyse terminée et sauvegardée");
+      if (error) notify("Analyse terminée, mais la sauvegarde a échoué"); else if (provider === "openai") notify("Analyse OpenAI terminée et sauvegardée");
     }
+    setIsAnalyzing(false);
   };
   const generateClipPlan = async () => {
     if (!videoMeta || !analysis || !videoRecordId) { notify("Analysez et sauvegardez d’abord la vidéo"); return; }
-    const target = Math.min(35, Math.max(12, Math.round(videoMeta.duration / Math.min(3, Math.max(1, Math.ceil(videoMeta.duration / 25))))));
-    const count = Math.min(3, Math.max(1, Math.floor(videoMeta.duration / target)));
-    const plans = Array.from({ length: count }, (_, index) => {
-      const start = Math.min(Math.max(0, videoMeta.duration - target), index * target);
-      const end = Math.min(videoMeta.duration, start + target);
-      return { user_id: userId, video_id: videoRecordId, title: index === 0 && hook.trim() ? hook.trim().slice(0, 72) : `Extrait ${index + 1} — ${videoMeta.name.replace(/\.[^.]+$/, "")}`, start_seconds: Number(start.toFixed(2)), end_seconds: Number(end.toFixed(2)), status: "Montage", score: Math.max(35, analysis.score - index * 4), retention: Math.max(25, analysis.retention - index * 3) };
-    });
-    const { error } = await supabase.from("studio_clips").insert(plans);
-    if (error) { notify("Impossible de créer les extraits"); return; }
-    await loadStudioClips(); changeView("clips"); notify(`${plans.length} extrait${plans.length > 1 ? "s" : ""} créé${plans.length > 1 ? "s" : ""} et sauvegardé${plans.length > 1 ? "s" : ""}`);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) { notify("Reconnectez-vous pour lancer le traitement"); return; }
+    notify("Transcription complète et sélection des meilleurs passages lancées…");
+    const started = await fetch("/api/studio/process", { method: "POST", headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" }, body: JSON.stringify({ videoId: videoRecordId }) });
+    const startPayload = await started.json() as { jobId?: string; error?: string };
+    if (!started.ok || !startPayload.jobId) { notify(startPayload.error || "Traitement impossible"); return; }
+    for (let attempt = 0; attempt < 150; attempt += 1) {
+      await new Promise((resolve) => window.setTimeout(resolve, attempt < 8 ? 2_000 : 5_000));
+      const response = await fetch(`/api/studio/process?jobId=${encodeURIComponent(startPayload.jobId)}`, { headers: { Authorization: `Bearer ${session.access_token}` }, cache: "no-store" });
+      const job = await response.json() as { status?: string; progress?: number; output?: { count?: number }; error?: string };
+      if (!response.ok || job.status === "failed") { notify(job.error || "Le traitement a échoué — relance disponible"); return; }
+      if (job.status === "completed") { await loadStudioClips(); changeView("clips"); notify(`${job.output?.count || 0} meilleurs passages créés à partir de la transcription`); return; }
+      if (job.progress) notify(`Traitement vidéo · ${job.progress}%`);
+    }
+    notify("Le traitement continue en arrière-plan et reprendra à votre retour");
   };
   const exportClip = async (clip: ClipItem) => {
-    const video = analysisVideoRef.current;
-    if (!video || !videoFileRef.current || clip.videoId !== videoRecordId || !("captureStream" in video) || typeof MediaRecorder === "undefined") { notify("Réouvrez la vidéo source dans Analyse pour exporter cet extrait"); return; }
     setClipExporting(clip.id);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error("missing-session");
+      notify("Rendu vertical sandbox lancé — quelques instants…");
+      const submitted = await fetch("/api/studio/render", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ clipId: clip.id }),
+      });
+      const submission = await submitted.json() as { renderId?: string; error?: string };
+      if (!submitted.ok || !submission.renderId) throw new Error(submission.error || "render-submission-failed");
+      for (let attempt = 0; attempt < 80; attempt += 1) {
+        await new Promise((resolve) => window.setTimeout(resolve, attempt < 4 ? 2_000 : 4_000));
+        const response = await fetch(`/api/studio/render?id=${encodeURIComponent(submission.renderId)}`, {
+          headers: { Authorization: `Bearer ${session.access_token}` }, cache: "no-store",
+        });
+        const render = await response.json() as { status?: string; url?: string; error?: string };
+        if (!response.ok) throw new Error(render.error || "render-status-failed");
+        if (render.status === "failed") throw new Error(render.error || "render-failed");
+        if (render.status === "done" && render.url) {
+          const link = document.createElement("a");
+          link.href = render.url;
+          link.target = "_blank";
+          link.rel = "noopener noreferrer";
+          link.click();
+          notify("MP4 vertical prêt — rendu sandbox filigrané");
+          return;
+        }
+      }
+      throw new Error("render-timeout");
+    } catch {
+      const video = analysisVideoRef.current;
+      if (!video || !videoFileRef.current || clip.videoId !== videoRecordId || !("captureStream" in video) || typeof MediaRecorder === "undefined") {
+        notify("Rendu distant indisponible — réouvrez la source pour l’export local");
+        return;
+      }
+      try {
       video.pause(); video.currentTime = clip.start;
       await new Promise<void>((resolve) => { const done = () => { video.removeEventListener("seeked", done); resolve(); }; video.addEventListener("seeked", done); });
       const stream = (video as HTMLVideoElement & { captureStream(): MediaStream }).captureStream();
@@ -545,13 +682,18 @@ function AppShell({ exit, plan, userId, userEmail, userName, signOut, theme, tog
       await new Promise<void>((resolve) => { const tick = () => video.currentTime >= clip.end || video.ended ? resolve() : requestAnimationFrame(tick); tick(); });
       recorder.stop(); video.pause(); await finished;
       const blob = new Blob(chunks, { type: "video/webm" }); const href = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = href; link.download = `${clip.title.replace(/[^a-zA-Z0-9-_]/g, "-").slice(0, 60)}.webm`; link.click(); window.setTimeout(() => URL.revokeObjectURL(href), 1500);
-      notify("Extrait vidéo exporté");
-    } catch { notify("L’export a échoué sur ce navigateur"); }
+        notify("Rendu distant indisponible — extrait WebM exporté localement");
+      } catch { notify("L’export a échoué sur ce navigateur"); }
+    }
     finally { setClipExporting(null); }
   };
   const selectPublishVideo = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    const allowedVideoTypes = new Set(["video/mp4", "video/quicktime", "video/webm"]);
+    if (!allowedVideoTypes.has(file.type) || !/\.(mp4|mov|webm)$/i.test(file.name) || file.size < 1_024 || file.size > 500 * 1024 * 1024) {
+      event.target.value = ""; notify("Vidéo refusée : MP4, MOV ou WebM, 500 Mo maximum"); return;
+    }
     if (publishUrl) URL.revokeObjectURL(publishUrl);
     const url = URL.createObjectURL(file);
     setPublishUrl(url);
@@ -639,7 +781,7 @@ function AppShell({ exit, plan, userId, userEmail, userName, signOut, theme, tog
             <div className="cs2-page-title"><div><span>CONTENT OPERATING SYSTEM</span><h1>Clips</h1><p>Repérez immédiatement les contenus à fort potentiel, les erreurs à corriger et la prochaine action.</p></div><button className="cs2-button" onClick={() => changeView("virality")}>✦ Nouvelle analyse</button></div>
             <div className="cs8-clip-summary"><article><span>Score moyen</span><strong><AnimatedNumber value={isDemo ? 80 : 0} suffix="/100" /></strong><small>{isDemo ? "+6 points cette semaine" : "Aucun clip analysé"}</small></article><article><span>Rétention estimée</span><strong><AnimatedNumber value={isDemo ? 68 : 0} suffix="%" /></strong><small>{isDemo ? "Objectif recommandé : 75 %" : "En attente d’une analyse"}</small></article><article><span>Prêts à publier</span><strong><AnimatedNumber value={isDemo ? 2 : 0} suffix=" clips" /></strong><small>{isDemo ? "1 validation nécessaire" : "Aucun clip prêt"}</small></article><article><span>Erreur prioritaire</span><strong>{isDemo ? "Accroche" : "—"}</strong><small>{isDemo ? "2 vidéos à renforcer" : "Aucune erreur détectée"}</small></article></div>
             <div className="cs2-filter-row">{["Tous", "Montage", "À valider", "Approuvé", "Publié"].map((filter) => <button className={clipFilter === filter ? "active" : ""} onClick={() => setClipFilter(filter)} key={filter}>{filter}</button>)}</div>
-            <div className="cs2-clip-grid cs8-clip-grid">{filteredClips.length ? filteredClips.map((clip,index) => <article className="cs2-clip-card cs8-clip-card" key={clip.id}><div className={`cs2-video-placeholder cs8-thumb ${clip.tone}`}><span>▶</span><div><b>{String(index + 1).padStart(2,"0")}</b><em>{clip.score >= 85 ? "TOP POTENTIEL" : clip.score >= 72 ? "À OPTIMISER" : "À RETRAVAILLER"}</em></div><small>{clip.format}</small></div><div className="cs2-clip-info"><div className="cs8-clip-top"><Status>{clip.status}</Status><span className={clip.score >= 80 ? "high" : "medium"}><b>{clip.score}</b>/100</span></div><h3>{clip.title}</h3><p>{clip.mission}</p><div className="cs8-mini-metrics"><span><small>RÉTENTION</small><b>{clip.retention}%</b><i><em style={{width:`${clip.retention}%`}} /></i></span><span><small>EXTRAIT</small><b>{Math.round(clip.start)}–{Math.round(clip.end)} s</b></span></div><div className="cs8-card-actions cs15-card-actions"><button onClick={() => { setHook(clip.title); setPlatform("TikTok"); changeView("virality"); }}>Réouvrir l’analyse</button><button onClick={() => exportClip(clip)} disabled={clipExporting === clip.id}>{clipExporting === clip.id ? "Export…" : "Télécharger"}</button><button onClick={() => void advanceClip(clip.id)} disabled={clip.status === "Publié"}>{clip.status === "Publié" ? "✓ Publié" : "Étape suivante →"}</button></div></div></article>) : <div className="cs11-empty-clips"><span>▶</span><h2>Votre bibliothèque est vide.</h2><p>Importez votre premier clip pour obtenir son score, sa rétention estimée et les améliorations prioritaires.</p><button className="cs2-button" onClick={() => changeView("virality")}>Analyser mon premier clip →</button></div>}</div>
+            <div className="cs2-clip-grid cs8-clip-grid">{filteredClips.length ? filteredClips.map((clip,index) => <article className="cs2-clip-card cs8-clip-card" key={clip.id}><div className={`cs2-video-placeholder cs8-thumb ${clip.tone}`}><span>▶</span><div><b>{String(index + 1).padStart(2,"0")}</b><em>{clip.score >= 85 ? "TOP POTENTIEL" : clip.score >= 72 ? "À OPTIMISER" : "À RETRAVAILLER"}</em></div><small>{clip.format}</small></div><div className="cs2-clip-info"><div className="cs8-clip-top"><Status>{clip.status}</Status><span className={clip.score >= 80 ? "high" : "medium"}><b>{clip.score}</b>/100</span></div><h3>{clip.title}</h3><p>{clip.mission}</p><div className="cs8-mini-metrics"><span><small>RÉTENTION</small><b>{clip.retention}%</b><i><em style={{width:`${clip.retention}%`}} /></i></span><span><small>EXTRAIT</small><b>{Math.round(clip.start)}–{Math.round(clip.end)} s</b></span></div><div className="cs8-card-actions cs15-card-actions"><button onClick={() => void openClipEditor(clip)}>Modifier</button><button onClick={() => exportClip(clip)} disabled={clipExporting === clip.id}>{clipExporting === clip.id ? "Export…" : "Télécharger"}</button><button onClick={() => void advanceClip(clip.id)} disabled={clip.status === "Publié"}>{clip.status === "Publié" ? "✓ Publié" : "Étape suivante →"}</button></div></div></article>) : <div className="cs11-empty-clips"><span>▶</span><h2>Votre bibliothèque est vide.</h2><p>Importez votre premier clip pour obtenir son score, sa rétention estimée et les améliorations prioritaires.</p><button className="cs2-button" onClick={() => changeView("virality")}>Analyser mon premier clip →</button></div>}</div>
           </>}
 
           {view === "virality" && <>
@@ -647,15 +789,15 @@ function AppShell({ exit, plan, userId, userEmail, userName, signOut, theme, tog
             <div className="cs2-viral-layout">
               <section className="cs2-panel cs2-analyzer">
                 <div className="cs2-analyzer-head"><span className="cs2-ai-icon">↗</span><div><h2>Analysez votre prochain clip</h2><p>La vidéo reste sur votre appareil pendant l’analyse et n’est jamais envoyée sans action de votre part.</p></div></div>
-                {!videoUrl ? <label className="cs2-upload-zone"><input type="file" accept="video/mp4,video/quicktime,video/webm" onChange={selectVideo} /><span>＋</span><strong>Déposez votre vidéo ici</strong><small>MP4, MOV ou WebM · 500 Mo maximum</small><b>Choisir un clip</b></label> : <div className="cs2-uploaded-video"><video ref={analysisVideoRef} src={videoUrl} controls playsInline /><div><strong>{videoMeta?.name ?? "Chargement de la vidéo…"}</strong>{videoMeta && <small>{videoMeta.duration} s · {videoMeta.width} × {videoMeta.height} px · {(videoMeta.size / 1048576).toFixed(1)} Mo</small>}<small className={`cs15-upload-state ${videoUploadState}`}>{videoUploadState === "uploading" ? "◷ Sauvegarde sécurisée en cours…" : videoUploadState === "ready" ? "✓ Vidéo enregistrée dans votre espace" : videoUploadState === "error" ? "⚠ Sauvegarde indisponible — analyse locale possible" : ""}</small><label>Remplacer<input type="file" accept="video/mp4,video/quicktime,video/webm" onChange={selectVideo} /></label></div></div>}
+                {!videoUrl ? <label className="cs2-upload-zone"><input type="file" accept="video/mp4,video/quicktime,video/webm" onChange={selectVideo} /><span>＋</span><strong>Déposez votre vidéo ici</strong><small>MP4, MOV ou WebM · 500 Mo maximum</small><b>Choisir un clip</b></label> : <div className="cs2-uploaded-video"><video ref={analysisVideoRef} src={videoUrl} controls playsInline /><div><strong>{videoMeta?.name ?? "Chargement de la vidéo…"}</strong>{videoMeta && <small>{videoMeta.duration} s · {videoMeta.width} × {videoMeta.height} px · {(videoMeta.size / 1048576).toFixed(1)} Mo</small>}<small className={`cs15-upload-state ${videoUploadState}`}>{videoUploadState === "uploading" ? `◷ Sauvegarde sécurisée · ${videoUploadProgress}%` : videoUploadState === "ready" ? "✓ Vidéo enregistrée dans votre espace" : videoUploadState === "error" ? "⚠ Sauvegarde indisponible — analyse locale possible" : ""}</small><label>Remplacer<input type="file" accept="video/mp4,video/quicktime,video/webm" onChange={selectVideo} /></label></div></div>}
                 <div className="cs2-analyzer-form"><label>Plateforme cible<select value={platform} onChange={(event) => setPlatform(event.target.value)}><option>TikTok</option><option>Instagram Reels</option><option>YouTube Shorts</option></select></label><label>Accroche des premières secondes<textarea value={hook} onChange={(event) => setHook(event.target.value)} placeholder="Ex. Cette erreur m’a fait perdre 10 000 €…" maxLength={140} /><small>{hook.length}/140</small></label></div>
-                <button className="cs2-button cs2-analyze-button" onClick={() => void analyzeVideo()} disabled={!videoMeta}>{videoMeta ? "Analyser le potentiel viral →" : "Ajoutez une vidéo pour commencer"}</button>
+                <button className="cs2-button cs2-analyze-button" onClick={() => void analyzeVideo()} disabled={!videoMeta || isAnalyzing}>{isAnalyzing ? "Analyse OpenAI en cours…" : videoMeta ? "Analyser avec OpenAI →" : "Ajoutez une vidéo pour commencer"}</button>
                 <p className="cs2-analysis-note">Le score est une estimation basée sur le format, la durée, la qualité et l’accroche. Il ne garantit pas les performances réelles.</p>
               </section>
 
               <section className={`cs2-panel cs2-analysis-result ${analysis ? "ready" : ""}`} aria-live="polite">
                 {!analysis ? <div className="cs2-empty-analysis"><span>◎</span><h2>Votre diagnostic apparaîtra ici</h2><p>Ajoutez une vidéo et son accroche pour obtenir le score, les points forts et les améliorations prioritaires.</p></div> : <>
-                  <div className="cs2-score-header"><div className="cs2-score-ring" style={{ "--score": `${analysis.score * 3.6}deg` } as CSSProperties}><span><strong>{analysis.score}</strong><small>/100</small></span></div><div><span className="cs2-potential-label">{analysis.verdict} · ANALYSE #{analysis.run}</span><h2>Potentiel viral estimé</h2><p>{analysis.summary}</p></div></div>
+                  <div className="cs2-score-header"><div className="cs2-score-ring" style={{ "--score": `${analysis.score * 3.6}deg` } as CSSProperties}><span><strong>{analysis.score}</strong><small>/100</small></span></div><div><span className="cs2-potential-label">{analysis.verdict} · ANALYSE #{analysis.run} · {analysisProvider === "openai" ? "OPENAI" : "DIAGNOSTIC LOCAL"}</span><h2>Potentiel viral estimé</h2><p>{analysis.summary}</p></div></div>
                   <div className="cs8-analysis-kpis"><span><small>RÉTENTION ESTIMÉE</small><strong>{analysis.retention}%</strong></span><span><small>CONFIANCE DU DIAGNOSTIC</small><strong>{analysis.confidence}%</strong></span><span><small>ERREURS DÉTECTÉES</small><strong>{analysis.improvements.length}</strong></span></div>
                   <div className="cs2-factor-list"><h3>Détail du score</h3>{analysis.factors.map((factor) => <div className="cs2-factor" key={factor.label}><div><b>{factor.label}</b><span>{factor.detail}</span><strong>{factor.score}%</strong></div><div><i style={{ width: `${factor.score}%` }} /></div></div>)}</div>
                   <div className="cs8-strengths"><h3>Ce qui fonctionne déjà</h3>{analysis.strengths.map((item) => <p key={item}><span>✓</span>{item}</p>)}</div>
@@ -753,6 +895,7 @@ function AppShell({ exit, plan, userId, userEmail, userName, signOut, theme, tog
 
       {showCreate && <div className="cs2-modal-backdrop" role="presentation" onMouseDown={(event) => event.currentTarget === event.target && setShowCreate(false)}><div className="cs2-modal" role="dialog" aria-modal="true" aria-labelledby="new-mission-title"><button className="cs2-modal-close" onClick={() => setShowCreate(false)} aria-label="Fermer">×</button><span>NOUVELLE MISSION</span><h2 id="new-mission-title">Que faut-il produire ?</h2><p>Créez la structure de la mission. Vous pourrez compléter le brief ensuite.</p><label>Nom de la mission<input autoFocus placeholder="Ex. Podcast Fondateurs #13" /></label><div className="cs2-form-row"><label>Client<input placeholder="Nom du client" /></label><label>Nombre de clips<input type="number" min="1" defaultValue="6" /></label></div><label>Échéance<input type="date" /></label><div className="cs2-modal-actions"><button onClick={() => setShowCreate(false)}>Annuler</button><button className="cs2-button" onClick={addMission}>Créer la mission</button></div></div></div>}
       {showConnect && <div className="cs2-modal-backdrop" role="presentation" onMouseDown={(event) => event.currentTarget === event.target && setShowConnect(false)}><div className="cs2-modal cs2-connect-modal" role="dialog" aria-modal="true" aria-labelledby="connect-title"><button className="cs2-modal-close" onClick={() => setShowConnect(false)} aria-label="Fermer">×</button><span>DERNIÈRE ÉTAPE</span><h2 id="connect-title">Connectez vos comptes</h2><p>La publication est prête. Pour envoyer réellement la vidéo, autorisez chaque réseau avec sa fenêtre officielle.</p><div className="cs2-connect-list">{socialPlatforms.filter((item) => selectedPlatforms.includes(item.id)).map((item) => <div key={item.id}><SocialIcon platform={item} /><b>{item.name}</b><small>À connecter</small></div>)}</div><div className="cs2-connect-security"><span>✓</span><p><b>Connexion OAuth sécurisée</b><br />Vos identifiants restent chez Instagram, TikTok, Google, Meta et les autres plateformes.</p></div><div className="cs2-modal-actions"><button onClick={() => setShowConnect(false)}>Revenir au brouillon</button><button className="cs2-button" onClick={() => notify("Intégration des comptes prête à être configurée")}>Configurer les connexions</button></div></div></div>}
+      {editorClip && editorDraft && <div className="cs2-modal-backdrop cs17-editor-backdrop" role="presentation"><div className="cs17-editor" role="dialog" aria-modal="true" aria-labelledby="editor-title"><header><div><span>ÉDITEUR CLIPSCALE</span><h2 id="editor-title">Montage et sous-titres</h2></div><div><button onClick={undoEditor} disabled={!editorUndo.length} aria-label="Annuler">↶</button><button onClick={redoEditor} disabled={!editorRedo.length} aria-label="Rétablir">↷</button><button onClick={() => { setEditorClip(null); setEditorDraft(null); setEditorVideoUrl(""); }} aria-label="Fermer">×</button></div></header><div className="cs17-editor-grid"><section className={`cs17-preview ratio-${editorDraft.aspectRatio.replace(":", "-")}`}>{editorVideoUrl ? <video src={`${editorVideoUrl}#t=${editorDraft.start},${editorDraft.end}`} controls playsInline /> : <div>Chargement de la source…</div>}<strong style={{ color: editorDraft.captionColor, fontSize: `${Math.max(18, editorDraft.fontSize / 2)}px` }}><em style={{ color: editorDraft.activeColor }}>MOT IMPORTANT</em><br />sous-titres dynamiques</strong></section><section className="cs17-controls"><label>Titre<input value={editorDraft.title} onChange={(e) => changeEditorDraft({ title: e.target.value })} maxLength={120}/></label><div className="cs17-time-row"><label>Début<input type="number" min="0" step="0.1" value={editorDraft.start} onChange={(e) => changeEditorDraft({ start: Number(e.target.value) })}/></label><label>Fin<input type="number" min={editorDraft.start + 1} step="0.1" value={editorDraft.end} onChange={(e) => changeEditorDraft({ end: Number(e.target.value) })}/></label></div><div className="cs17-timeline"><span style={{ width: `${Math.min(100, Math.max(2, (editorDraft.end - editorDraft.start) / Math.max(editorDraft.end, 1) * 100))}%` }}/><small>{editorDraft.start.toFixed(1)} s → {editorDraft.end.toFixed(1)} s</small></div><div className="cs17-time-row"><label>Format<select value={editorDraft.aspectRatio} onChange={(e) => changeEditorDraft({ aspectRatio: e.target.value })}><option>9:16</option><option>1:1</option><option>4:5</option><option>16:9</option></select></label><label>Style<select value={editorDraft.style} onChange={(e) => changeEditorDraft({ style: e.target.value })}><option value="clean">Sobre</option><option value="podcast">Podcast</option><option value="storytelling">Storytelling</option><option value="dynamic">Énergique</option><option value="premium">Premium</option></select></label></div><label>Cadrage horizontal<input type="range" min="-1" max="1" step="0.05" value={editorDraft.framingX} onChange={(e) => changeEditorDraft({ framingX: Number(e.target.value) })}/></label><label>Cadrage vertical<input type="range" min="-1" max="1" step="0.05" value={editorDraft.framingY} onChange={(e) => changeEditorDraft({ framingY: Number(e.target.value) })}/></label><div className="cs17-time-row"><label>Texte<input type="color" value={editorDraft.captionColor} onChange={(e) => changeEditorDraft({ captionColor: e.target.value })}/></label><label>Mot actif<input type="color" value={editorDraft.activeColor} onChange={(e) => changeEditorDraft({ activeColor: e.target.value })}/></label></div><label>Taille des sous-titres<input type="range" min="24" max="96" value={editorDraft.fontSize} onChange={(e) => changeEditorDraft({ fontSize: Number(e.target.value) })}/></label><label className="cs17-check"><input type="checkbox" checked={editorDraft.zoomEnabled} onChange={(e) => changeEditorDraft({ zoomEnabled: e.target.checked })}/> Zoom automatique</label><label className="cs17-check"><input type="checkbox" checked={editorDraft.silenceRemoval} onChange={(e) => changeEditorDraft({ silenceRemoval: e.target.checked })}/> Repérer les silences à couper</label></section></div><footer><small>Sauvegarde versionnée · historique conservé</small><button onClick={() => { setEditorClip(null); setEditorDraft(null); }}>Annuler</button><button className="cs2-button" onClick={() => void saveClipEditor()} disabled={editorSaving}>{editorSaving ? "Sauvegarde…" : "Sauvegarder le montage"}</button></footer></div></div>}
       <button className="cs4-support-fab" onClick={() => setShowSupport(true)} aria-label="Ouvrir le support"><span>?</span><b>Support</b></button>
       {showSupport && <div className="cs2-modal-backdrop" role="presentation" onMouseDown={(event) => event.currentTarget === event.target && setShowSupport(false)}><div className="cs2-modal cs4-support-modal" role="dialog" aria-modal="true" aria-labelledby="support-title"><button className="cs2-modal-close" onClick={() => setShowSupport(false)} aria-label="Fermer">×</button><span>SUPPORT CLIPSCALE</span><h2 id="support-title">Comment peut-on vous aider ?</h2><p>{userId ? "Votre demande sera enregistrée dans votre espace." : "Connectez-vous pour envoyer une demande suivie à notre équipe."}</p><label>Sujet<input value={supportSubject} onChange={(e) => setSupportSubject(e.target.value)} placeholder="Ex. Connexion Instagram" /></label><label>Votre message<textarea value={supportMessage} onChange={(e) => setSupportMessage(e.target.value)} placeholder="Décrivez précisément votre question…" /></label><div className="cs4-support-options"><button onClick={() => notify("Centre d’aide bientôt disponible")}>⌕ Centre d’aide</button><button onClick={() => notify("Email : support@clipscale.app")}>✉ Nous écrire</button></div><button className="cs2-button" disabled={!userId || supportSending || !supportSubject.trim() || !supportMessage.trim()} onClick={sendSupportTicket}>{supportSending ? "Envoi…" : userId ? "Envoyer la demande →" : "Connectez-vous pour envoyer"}</button></div></div>}
       {toast && <div className="cs2-toast" role="status">✓ {toast}</div>}

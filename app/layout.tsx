@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
+import "./google-auth.css";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://clipscale-kappa.vercel.app";
 
