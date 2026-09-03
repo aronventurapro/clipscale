@@ -490,11 +490,11 @@ function Landing({
           <Logo />
         </a>
         <nav aria-label="Navigation principale">
-          <a href="#missions">Missions</a>
-          <a href="#clippeurs">Clippeurs</a>
-          <a href="#workflow">Fonctionnement</a>
-          <a href="#pricing">Tarifs</a>
-          <a href="#cas-clients">Cas clients</a>
+          <a href="/missions">Missions</a>
+          <a href="/clippeurs">Clippeurs</a>
+          <a href="/comment-ca-marche">Fonctionnement</a>
+          <a href="/tarifs">Tarifs</a>
+          <a href="/cas-clients">Cas clients</a>
         </nav>
         <div className="cs-theme-actions">
           <button
@@ -6019,9 +6019,26 @@ export default function Home() {
         setCookieChoice(savedCookies);
     }, 0);
     const hydrate = async () => {
-      const { data: sessionData, error: sessionIssue } =
-        await supabase.auth.getSession();
-      if (sessionIssue) await supabase.auth.signOut({ scope: "local" });
+      let sessionResult = await supabase.auth.getSession();
+      for (const delay of [400, 1_200]) {
+        if (!sessionResult.error) break;
+        await new Promise((resolve) => window.setTimeout(resolve, delay));
+        sessionResult = await supabase.auth.getSession();
+      }
+      const { data: sessionData, error: sessionIssue } = sessionResult;
+      if (sessionIssue) {
+        const permanentFailure = /invalid refresh token|refresh token not found/i.test(
+          sessionIssue.message,
+        );
+        if (permanentFailure) await supabase.auth.signOut({ scope: "local" });
+        setSessionError(
+          permanentFailure
+            ? "Votre session a expiré. Reconnectez-vous pour continuer."
+            : "La session n’a pas pu être renouvelée. Vérifiez votre connexion puis réessayez.",
+        );
+        setSessionLoading(false);
+        return;
+      }
       const session = sessionData.session;
       if (!session?.user) {
         setSessionLoading(false);

@@ -248,3 +248,24 @@ test("commercial video processing never provisions an implicit free trial", asyn
   assert.match(migration, /status in \('trialing', 'active'\)/);
   assert.match(migration, /processing_jobs_clip_id_idx/);
 });
+
+test("transient Supabase session failures are retried without destructive sign-out", async () => {
+  const page = await readFile(new URL("app/page.tsx", root), "utf8");
+  assert.match(page, /for \(const delay of \[400, 1_200\]\)/);
+  assert.match(page, /invalid refresh token\|refresh token not found/i);
+  assert.match(page, /La session n’a pas pu être renouvelée/);
+});
+
+test("public navigation routes resolve to their matching landing sections", async () => {
+  const routes = new Map([
+    ["missions", "#missions"],
+    ["clippeurs", "#clippeurs"],
+    ["comment-ca-marche", "#workflow"],
+    ["tarifs", "#pricing"],
+    ["cas-clients", "#cas-clients"],
+  ]);
+  for (const [route, anchor] of routes) {
+    const source = await readFile(new URL(`app/${route}/page.tsx`, root), "utf8");
+    assert.match(source, new RegExp(`redirect\\(\"/${anchor}\"\\)`));
+  }
+});
