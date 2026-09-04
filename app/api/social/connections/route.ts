@@ -12,7 +12,17 @@ export async function GET(request: Request) {
   const { data, error } = await admin.from("social_connections").select("platform,status,provider_account_name,expires_at,updated_at").eq("user_id", auth.user.id);
   if (error) return jsonError("Connexions indisponibles", 503, auth.requestId);
   const platforms = ["youtube", "instagram", "facebook", "tiktok", "linkedin"] as const;
-  return Response.json({ connections: platforms.map((platform) => ({ platform, configured: socialOAuthReady(platform), ...(data?.find((row) => row.platform === platform) || { status: "disconnected" }) })) }, { headers: { "Cache-Control": "no-store" } });
+  return Response.json({ connections: platforms.map((platform) => {
+    const connection = data?.find((row) => row.platform === platform);
+    return {
+      platform,
+      configured: socialOAuthReady(platform),
+      status: connection?.status || "disconnected",
+      provider_account_name: connection?.provider_account_name || null,
+      expires_at: connection?.expires_at || null,
+      updated_at: connection?.updated_at || null,
+    };
+  }) }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function DELETE(request: Request) {
