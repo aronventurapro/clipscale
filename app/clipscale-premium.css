@@ -73,6 +73,10 @@
     0 8px 20px #0005;
   transform: none !important;
 }
+
+.cs2-connect-list > div > span { display: grid; gap: 4px; min-width: 0; }
+.cs2-connect-list > div > span small { color: #777b85; background: transparent; padding: 0; }
+.cs2-connect-list > div > button { border: 1px solid #d6d0eb; border-radius: 7px; background: #f8f6ff; color: #654ac6; padding: 7px 8px; font-size: 10px; font-weight: 800; }
 .cs14-marquee-group > span > b {
   margin: 0 !important;
   color: #dedee5 !important;

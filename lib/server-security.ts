@@ -47,6 +47,24 @@ export async function authenticate(request: Request): Promise<AuthenticatedReque
   return error || !user ? null : { supabase, user, requestId: requestId(request) };
 }
 
+export async function hasCommercialAccess(auth: AuthenticatedRequest) {
+  const email = auth.user.email?.trim().toLowerCase();
+  const [{ data: subscription, error: subscriptionError }, { data: grant, error: grantError }] = await Promise.all([
+    auth.supabase.from("user_subscriptions").select("status").eq("user_id", auth.user.id).maybeSingle(),
+    email
+      ? auth.supabase.from("access_grants").select("active").eq("email", email).eq("active", true).maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+  ]);
+  if (subscriptionError || grantError) {
+    console.error("commercial_access_lookup_failed", { requestId: auth.requestId });
+    return { allowed: false, unavailable: true };
+  }
+  return {
+    allowed: Boolean(subscription && ["active", "trialing"].includes(String(subscription.status))) || Boolean(grant?.active),
+    unavailable: false,
+  };
+}
+
 export async function consumeRateLimit(
   auth: AuthenticatedRequest,
   action: string,

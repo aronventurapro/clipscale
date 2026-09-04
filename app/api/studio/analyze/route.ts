@@ -1,4 +1,4 @@
-import { authenticate, bodyWithinLimit, consumeRateLimit, hasAllowedOrigin, jsonError } from "@/lib/server-security";
+import { authenticate, bodyWithinLimit, consumeRateLimit, hasAllowedOrigin, hasCommercialAccess, jsonError } from "@/lib/server-security";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -50,6 +50,8 @@ export async function POST(request: Request) {
   if (!bodyWithinLimit(request, 1_600_000)) return jsonError("Requête trop volumineuse", 413);
   const auth = await authenticate(request);
   if (!auth) return jsonError("Authentification requise", 401);
+  const access = await hasCommercialAccess(auth);
+  if (!access.allowed) return jsonError(access.unavailable ? "Contrôle d’accès indisponible" : "Abonnement requis pour lancer l’analyse", access.unavailable ? 503 : 402, auth.requestId);
   const rateLimit = await consumeRateLimit(auth, "studio_analyze_requested", 10, 600);
   if (!rateLimit.allowed) return jsonError(rateLimit.unavailable ? "Contrôle de sécurité indisponible" : "Trop d’analyses demandées", rateLimit.unavailable ? 503 : 429, auth.requestId);
 

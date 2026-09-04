@@ -31,6 +31,22 @@ test("operational health reports readiness without exposing secrets", async () =
   assert.doesNotMatch(health, /process\.env\.[A-Z_]+\s*[,}]/);
 });
 
+test("social OAuth is state-bound, encrypted and server-only", async () => {
+  const oauth = await readFile(new URL("lib/social-oauth.ts", root), "utf8");
+  const connect = await readFile(new URL("app/api/social/connect/route.ts", root), "utf8");
+  const callback = await readFile(new URL("app/api/social/callback/route.ts", root), "utf8");
+  const connections = await readFile(new URL("app/api/social/connections/route.ts", root), "utf8");
+  const migration = await readFile(new URL("supabase/migrations/20260904062000_social_oauth_connections.sql", root), "utf8");
+  assert.match(oauth, /aes-256-gcm/);
+  assert.match(oauth, /timingSafeEqual/);
+  assert.match(connect, /HttpOnly; Secure; SameSite=Lax/);
+  assert.match(callback, /clipscale_oauth_state/);
+  assert.match(connections, /auth\.user\.id/);
+  assert.match(migration, /enable row level security/);
+  assert.match(migration, /revoke all.*authenticated/);
+  assert.doesNotMatch(connect + callback + connections, /NEXT_PUBLIC_.*SECRET/);
+});
+
 test("account data rights are authenticated, rate limited and owner scoped", async () => {
   const accountRoutes = [
     "app/api/account/export/route.ts",
@@ -84,6 +100,8 @@ test("studio APIs enforce auth, origin, size and rate limits", async () => {
   );
   assert.match(analyze, /hasAllowedOrigin/);
   assert.match(analyze, /bodyWithinLimit/);
+  assert.match(analyze, /hasCommercialAccess/);
+  assert.match(render, /hasCommercialAccess/);
   assert.match(render, /ownsRender/);
   assert.match(render, /createSignedUrl\(source\.file_path, 1_800\)/);
 });
@@ -247,6 +265,13 @@ test("commercial video processing never provisions an implicit free trial", asyn
   assert.match(migration, /subscription_inactive/);
   assert.match(migration, /status in \('trialing', 'active'\)/);
   assert.match(migration, /processing_jobs_clip_id_idx/);
+});
+
+test("billing schema accepts every current plan and inactive cancellations", async () => {
+  const migration = await readFile(new URL("supabase/migrations/20260904050000_granted_commercial_access.sql", root), "utf8");
+  for (const plan of ["starter", "pro", "agency"]) assert.match(migration, new RegExp(`'${plan}'`));
+  assert.match(migration, /'inactive'/);
+  assert.match(migration, /access_grants/);
 });
 
 test("transient Supabase session failures are retried without destructive sign-out", async () => {

@@ -1,4 +1,4 @@
-import { authenticate, bodyWithinLimit, consumeRateLimit, hasAllowedOrigin, jsonError, ownsRender, recordEvent } from "@/lib/server-security";
+import { authenticate, bodyWithinLimit, consumeRateLimit, hasAllowedOrigin, hasCommercialAccess, jsonError, ownsRender, recordEvent } from "@/lib/server-security";
 import { videoRenderWorkflow } from "@/workflows/video-render";
 import { start as startWorkflow } from "workflow/api";
 
@@ -20,6 +20,8 @@ export async function POST(request: Request) {
   if (!bodyWithinLimit(request, 2_048)) return jsonError("Requête trop volumineuse", 413);
   const auth = await authenticate(request);
   if (!auth) return jsonError("Authentification requise", 401);
+  const access = await hasCommercialAccess(auth);
+  if (!access.allowed) return jsonError(access.unavailable ? "Contrôle d’accès indisponible" : "Abonnement requis pour lancer un rendu", access.unavailable ? 503 : 402, auth.requestId);
   const accessToken = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") || "";
   const rateLimit = await consumeRateLimit(auth, "studio_render_requested", 5, 600);
   if (!rateLimit.allowed) return jsonError(rateLimit.unavailable ? "Contrôle de sécurité indisponible" : "Trop de rendus demandés", rateLimit.unavailable ? 503 : 429, auth.requestId);

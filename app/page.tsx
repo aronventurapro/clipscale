@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 57703)
+Total output lines: 6286
+
 "use client";
 
 import {
@@ -122,6 +125,7 @@ type SocialPlatform = {
   tips: string[];
 };
 type AccountRole = "Agence" | "Créateur" | "Clippeur";
+type SocialConnection = { platform: string; configured: boolean; status: "connected" | "disconnected" | "expired" | "revoked" | "error"; provider_account_name?: string | null };
 
 const OWNER_EMAIL = "aron.venturapro@gmail.com";
 
@@ -1347,7 +1351,7 @@ function Landing({
             ],
             [
               "Puis-je essayer sans payer ?",
-              "Oui. Votre espace démarre avec 14 jours d’essai. Stripe sera connecté à la dernière étape avant l’ouverture des abonnements payants.",
+              "Vous pouvez découvrir gratuitement l’interface. Un abonnement est requis avant toute analyse ou tout rendu qui engage des coûts fournisseurs.",
             ],
             [
               "Le score viral garantit-il des vues ?",
@@ -1995,6 +1999,8 @@ function AppShell({
   const [publishMode, setPublishMode] = useState<"now" | "schedule">("now");
   const [scheduledAt, setScheduledAt] = useState("");
   const [showConnect, setShowConnect] = useState(false);
+  const [socialConnections, setSocialConnections] = useState<SocialConnection[]>([]);
+  const [socialBusy, setSocialBusy] = useState<string | null>(null);
   const [showSupport, setShowSupport] = useState(false);
   const [supportSubject, setSupportSubject] = useState("");
   const [supportMessage, setSupportMessage] = useState("");
@@ -2398,6 +2404,40 @@ function AppShell({
   const authorizationHeaders = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     return { Authorization: `Bearer ${session?.access_token || ""}` };
+  };
+  const loadSocialConnections = async () => {
+    const response = await fetch("/api/social/connections", { headers: await authorizationHeaders(), cache: "no-store" });
+    const payload = await response.json().catch(() => ({ connections: [] })) as { connections?: SocialConnection[] };
+    setSocialConnections(response.ok ? payload.connections || [] : []);
+  };
+  const connectSocial = async (platform: string) => {
+    setSocialBusy(platform);
+    const response = await fetch("/api/social/connect", {
+      method: "POST",
+      headers: { ...(await authorizationHeaders()), "Content-Type": "application/json" },
+      body: JSON.stringify({ platform }),
+    });
+    const payload = await response.json().catch(() => ({ error: "Connexion indisponible" })) as { url?: string; error?: string };
+    if (!response.ok || !payload.url) {
+      setSocialBusy(null);
+      notify(payload.error || "Connexion indisponible");
+      return;
+    }
+    const destination = new URL(payload.url);
+    if (destination.protocol !== "https:") {
+      setSocialBusy(null);
+      notify("Adresse d’autorisation refusée");
+      return;
+    }
+    window.location.assign(destination.toString());
+  };
+  const disconnectSocial = async (platform: string) => {
+    setSocialBusy(platform);
+    const response = await fetch(`/api/social/connections?platform=${encodeURIComponent(platform)}`, { method: "DELETE", headers: await authorizationHeaders() });
+    setSocialBusy(null);
+    if (!response.ok) { notify("Déconnexion impossible"); return; }
+    await loadSocialConnections();
+    notify("Compte déconnecté de ClipScale");
   };
   const startCheckout = async (plan: "starter" | "pro" | "agency") => {
     const response = await fetch("/api/billing/checkout", {
@@ -2947,848 +2987,7 @@ function AppShell({
       const response = await fetch("/api/studio/analyze", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          platform,
-          hook,
-          frameDataUrl,
-          video: {
-            filename: videoMeta.name,
-            duration: videoMeta.duration,
-            width: videoMeta.width,
-            height: videoMeta.height,
-          },
-        }),
-      });
-      const payload = (await response.json()) as {
-        analysis?: Omit<ViralAnalysis, "run">;
-        provider?: "openai";
-        error?: string;
-      };
-      if (!response.ok || !payload.analysis)
-        throw new Error(payload.error || "analysis-failed");
-      result = { ...payload.analysis, run: nextRun };
-      provider = "openai";
-    } catch {
-      notify("OpenAI indisponible : diagnostic technique local utilisé");
-    }
-    setAnalysis(result);
-    setAnalysisProvider(provider);
-    setAnalysisRun(nextRun);
-    if (videoRecordId) {
-      const { error } = await supabase
-        .from("studio_videos")
-        .update({
-          platform,
-          hook,
-          score: result.score,
-          retention: result.retention,
-          confidence: result.confidence,
-          analysis: result,
-          status: "analyzed",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", videoRecordId)
-        .eq("user_id", userId);
-      if (error) notify("Analyse terminée, mais la sauvegarde a échoué");
-      else if (provider === "openai")
-        notify("Analyse OpenAI terminée et sauvegardée");
-    }
-    setIsAnalyzing(false);
-  };
-  const generateClipPlan = async () => {
-    if (!videoMeta || !analysis || !videoRecordId) {
-      notify("Analysez et sauvegardez d’abord la vidéo");
-      return;
-    }
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session?.access_token) {
-      notify("Reconnectez-vous pour lancer le traitement");
-      return;
-    }
-    notify(
-      "Transcription complète et sélection des meilleurs passages lancées…",
-    );
-    const started = await fetch("/api/studio/process", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${session.access_token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ videoId: videoRecordId }),
-    });
-    const startPayload = (await started.json()) as {
-      jobId?: string;
-      error?: string;
-    };
-    if (!started.ok || !startPayload.jobId) {
-      notify(startPayload.error || "Traitement impossible");
-      return;
-    }
-    for (let attempt = 0; attempt < 150; attempt += 1) {
-      await new Promise((resolve) =>
-        window.setTimeout(resolve, attempt < 8 ? 2_000 : 5_000),
-      );
-      const response = await fetch(
-        `/api/studio/process?jobId=${encodeURIComponent(startPayload.jobId)}`,
-        {
-          headers: { Authorization: `Bearer ${session.access_token}` },
-          cache: "no-store",
-        },
-      );
-      const job = (await response.json()) as {
-        status?: string;
-        progress?: number;
-        output?: { count?: number };
-        error?: string;
-      };
-      if (!response.ok || job.status === "failed") {
-        notify(job.error || "Le traitement a échoué — relance disponible");
-        return;
-      }
-      if (job.status === "completed") {
-        await loadStudioClips();
-        changeView("clips");
-        notify(
-          `${job.output?.count || 0} meilleurs passages créés à partir de la transcription`,
-        );
-        return;
-      }
-      if (job.progress) notify(`Traitement vidéo · ${job.progress}%`);
-    }
-    notify(
-      "Le traitement continue en arrière-plan et reprendra à votre retour",
-    );
-  };
-  const retryProcessingJob = async (jobId: string) => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.access_token) { notify("Reconnectez-vous pour relancer le traitement"); return; }
-    const response = await fetch("/api/studio/process", { method: "POST", headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" }, body: JSON.stringify({ retryJobId: jobId }) });
-    const payload = (await response.json()) as { error?: string };
-    if (!response.ok) { notify(payload.error || "Relance impossible"); return; }
-    setFailedJobs((jobs) => jobs.filter((job) => job.id !== jobId));
-    notify("Traitement relancé — il continuera même si vous fermez ClipScale");
-  };
-  const exportClip = async (clip: ClipItem) => {
-    setClipExporting(clip.id);
-    try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session?.access_token) throw new Error("missing-session");
-      notify("Rendu vertical sandbox lancé — quelques instants…");
-      const submitted = await fetch("/api/studio/render", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ clipId: clip.id }),
-      });
-      const submission = (await submitted.json()) as {
-        renderId?: string;
-        error?: string;
-      };
-      if (!submitted.ok || !submission.renderId)
-        throw new Error(submission.error || "render-submission-failed");
-      for (let attempt = 0; attempt < 80; attempt += 1) {
-        await new Promise((resolve) =>
-          window.setTimeout(resolve, attempt < 4 ? 2_000 : 4_000),
-        );
-        const response = await fetch(
-          `/api/studio/render?id=${encodeURIComponent(submission.renderId)}`,
-          {
-            headers: { Authorization: `Bearer ${session.access_token}` },
-            cache: "no-store",
-          },
-        );
-        const render = (await response.json()) as {
-          status?: string;
-          url?: string;
-          error?: string;
-        };
-        if (!response.ok)
-          throw new Error(render.error || "render-status-failed");
-        if (render.status === "failed")
-          throw new Error(render.error || "render-failed");
-        if (render.status === "done" && render.url) {
-          const link = document.createElement("a");
-          link.href = render.url;
-          link.target = "_blank";
-          link.rel = "noopener noreferrer";
-          link.click();
-          notify("MP4 vertical prêt — rendu sandbox filigrané");
-          return;
-        }
-      }
-      throw new Error("render-timeout");
-    } catch {
-      const video = analysisVideoRef.current;
-      if (
-        !video ||
-        !videoFileRef.current ||
-        clip.videoId !== videoRecordId ||
-        !("captureStream" in video) ||
-        typeof MediaRecorder === "undefined"
-      ) {
-        notify(
-          "Rendu distant indisponible — réouvrez la source pour l’export local",
-        );
-        return;
-      }
-      try {
-        video.pause();
-        video.currentTime = clip.start;
-        await new Promise<void>((resolve) => {
-          const done = () => {
-            video.removeEventListener("seeked", done);
-            resolve();
-          };
-          video.addEventListener("seeked", done);
-        });
-        const stream = (
-          video as HTMLVideoElement & { captureStream(): MediaStream }
-        ).captureStream();
-        const mimeType = MediaRecorder.isTypeSupported(
-          "video/webm;codecs=vp9,opus",
-        )
-          ? "video/webm;codecs=vp9,opus"
-          : "video/webm";
-        const recorder = new MediaRecorder(stream, { mimeType });
-        const chunks: BlobPart[] = [];
-        recorder.ondataavailable = (event) => {
-          if (event.data.size) chunks.push(event.data);
-        };
-        const finished = new Promise<void>((resolve) => {
-          recorder.onstop = () => resolve();
-        });
-        recorder.start(500);
-        await video.play();
-        await new Promise<void>((resolve) => {
-          const tick = () =>
-            video.currentTime >= clip.end || video.ended
-              ? resolve()
-              : requestAnimationFrame(tick);
-          tick();
-        });
-        recorder.stop();
-        video.pause();
-        await finished;
-        const blob = new Blob(chunks, { type: "video/webm" });
-        const href = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = href;
-        link.download = `${clip.title.replace(/[^a-zA-Z0-9-_]/g, "-").slice(0, 60)}.webm`;
-        link.click();
-        window.setTimeout(() => URL.revokeObjectURL(href), 1500);
-        notify("Rendu distant indisponible — extrait WebM exporté localement");
-      } catch {
-        notify("L’export a échoué sur ce navigateur");
-      }
-    } finally {
-      setClipExporting(null);
-    }
-  };
-  const selectPublishVideo = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    const allowedVideoTypes = new Set([
-      "video/mp4",
-      "video/quicktime",
-      "video/webm",
-    ]);
-    if (
-      !allowedVideoTypes.has(file.type) ||
-      !/\.(mp4|mov|webm)$/i.test(file.name) ||
-      file.size < 1_024 ||
-      file.size > 500 * 1024 * 1024
-    ) {
-      event.target.value = "";
-      notify("Vidéo refusée : MP4, MOV ou WebM, 500 Mo maximum");
-      return;
-    }
-    if (publishUrl) URL.revokeObjectURL(publishUrl);
-    const url = URL.createObjectURL(file);
-    setPublishUrl(url);
-    setPublishFileName(file.name);
-    setPublishVideoMeta(null);
-    const probe = document.createElement("video");
-    probe.preload = "metadata";
-    probe.onloadedmetadata = () =>
-      setPublishVideoMeta({
-        name: file.name,
-        duration: Math.round(probe.duration),
-        width: probe.videoWidth,
-        height: probe.videoHeight,
-        size: file.size,
-      });
-    probe.src = url;
-  };
-  const togglePlatform = (id: string) =>
-    setSelectedPlatforms((current) => {
-      const next = current.includes(id)
-        ? current.filter((item) => item !== id)
-        : [...current, id];
-      if (!next.includes(activeCustomize))
-        setActiveCustomize(next[0] ?? "instagram");
-      return next;
-    });
-  const buildPlatformCopy = (id: string) => {
-    const base = publishCaption.trim();
-    if (id === "instagram") return `${base}\n\n#reels #video #creation`;
-    if (id === "tiktok")
-      return `${base.slice(0, 240)}\n\nVous feriez quoi à ma place ? #pourtoi #createur`;
-    if (id === "youtube")
-      return `${base}\n\nAbonnez-vous pour découvrir les prochaines vidéos.`;
-    if (id === "facebook")
-      return `${base}\n\nQu’en pensez-vous ? Dites-le-nous en commentaire.`;
-    if (id === "linkedin")
-      return `Un apprentissage à retenir :\n\n${base}\n\nEt vous, comment abordez-vous ce sujet ?`;
-    if (id === "threads") return `${base.slice(0, 280)}\n\nVotre avis ?`;
-    if (id === "pinterest")
-      return `${base}\n\nEnregistrez cette vidéo pour la retrouver plus tard.`;
-    if (id === "snapchat") return base.slice(0, 140);
-    if (id === "telegram")
-      return `${base}\n\nPartagez cette vidéo à une personne que cela peut aider.`;
-    return `${base.slice(0, 240)}\n\nQu’en pensez-vous ?`;
-  };
-  const adaptCopies = () => {
-    if (!publishCaption.trim() || !selectedPlatforms.length) return;
-    setPlatformCopies((current) =>
-      Object.fromEntries(
-        selectedPlatforms.map((id) => [
-          id,
-          current[id] || buildPlatformCopy(id),
-        ]),
-      ),
-    );
-    setAdaptedPlatforms([...selectedPlatforms]);
-    setActiveCustomize(
-      selectedPlatforms.includes(activeCustomize)
-        ? activeCustomize
-        : selectedPlatforms[0],
-    );
-    if (selectedPlatforms.includes("youtube") && !youtubeTitle.trim())
-      setYoutubeTitle(
-        publishCaption
-          .trim()
-          .split(/[.!?\n]/)[0]
-          .slice(0, 80),
-      );
-    notify(
-      `${selectedPlatforms.length} variante${selectedPlatforms.length > 1 ? "s" : ""} prête${selectedPlatforms.length > 1 ? "s" : ""}`,
-    );
-  };
-  const activePlatform =
-    socialPlatforms.find((item) => item.id === activeCustomize) ??
-    socialPlatforms[0];
-  const allCopiesReady =
-    selectedPlatforms.length > 0 &&
-    selectedPlatforms.every(
-      (id) => adaptedPlatforms.includes(id) && platformCopies[id]?.trim(),
-    );
-  const publishReady = Boolean(
-    publishUrl &&
-    publishCaption.trim() &&
-    allCopiesReady &&
-    (!selectedPlatforms.includes("youtube") || youtubeTitle.trim()) &&
-    (publishMode === "now" || scheduledAt),
-  );
-  const sendSupportTicket = async () => {
-    if (!userId || !supportSubject.trim() || !supportMessage.trim()) return;
-    setSupportSending(true);
-    const { data: membership } = await supabase
-      .from("workspace_members")
-      .select("workspace_id")
-      .eq("user_id", userId)
-      .limit(1)
-      .maybeSingle();
-    const { error } = await supabase
-      .from("support_tickets")
-      .insert({
-        workspace_id: membership?.workspace_id || null,
-        user_id: userId,
-        subject: supportSubject.trim(),
-        message: supportMessage.trim(),
-      });
-    setSupportSending(false);
-    if (error) notify("Impossible d’envoyer la demande pour le moment");
-    else {
-      setShowSupport(false);
-      setSupportSubject("");
-      setSupportMessage("");
-      notify("Demande envoyée au support");
-    }
-  };
-
-  return (
-    <div className="cs2-app">
-      <aside className="cs2-sidebar">
-        <button
-          className="cs2-brand-button"
-          onClick={() => changeView("overview")}
-          aria-label="Accueil ClipScale"
-        >
-          <Logo />
-        </button>
-        <button
-          className="cs10-workspace-card"
-          onClick={() => changeView("settings")}
-        >
-          <span>{initials}</span>
-          <span>
-            <b>ClipScale Studio</b>
-            <small>
-              {isAdmin
-                ? "Espace propriétaire"
-                : isDemo
-                  ? "Aperçu interactif"
-                  : "Espace agence"}
-            </small>
-          </span>
-          <em>⌄</em>
-        </button>
-        <nav aria-label="Navigation de l’application">
-          {visibleNavItems.map((item) => (
-            <button
-              key={item.id}
-              className={view === item.id ? "active" : ""}
-              onClick={() => changeView(item.id)}
-            >
-              <span>{item.icon}</span>
-              {item.label}
-            </button>
-          ))}
-        </nav>
-        {isDemo ? (
-          <div className="cs2-demo-card">
-            <b>Aperçu interactif</b>
-            <p>Explorez le cockpit avec un jeu de données d’exemple.</p>
-            <button onClick={exit}>Revenir au site</button>
-          </div>
-        ) : (
-          <div className="cs2-demo-card cs10-production-card">
-            <b>
-              <i /> Espace opérationnel
-            </b>
-            <p>Session sécurisée · données du compte synchronisées.</p>
-            <button onClick={() => changeView("settings")}>
-              Gérer l’espace →
-            </button>
-          </div>
-        )}
-      </aside>
-
-      <main className="cs2-workspace">
-        <header className="cs2-app-header">
-          <div className="cs2-mobile-brand">
-            <Logo />
-          </div>
-          <div className="cs10-breadcrumb">
-            <small>CLIPSCALE STUDIO</small>
-            <b>{navItems.find((item) => item.id === view)?.label}</b>
-          </div>
-          <span className={`cs2-demo-pill ${isDemo ? "preview" : "live"}`}>
-            {isAdmin
-              ? "● PROPRIÉTAIRE"
-              : isDemo
-                ? "● APERÇU"
-                : "● BÊTA GRATUITE"}
-          </span>
-          <span className="cs2-plan-pill">
-            ✦ {complimentaryAccess || isAdmin ? "Agency" : "Bêta"}
-          </span>
-          <div className="cs2-header-actions">
-            <button
-              className="cs-theme-toggle"
-              onClick={toggleTheme}
-              aria-label={
-                theme === "dark"
-                  ? "Activer le mode clair"
-                  : "Activer le mode sombre"
-              }
-              title={theme === "dark" ? "Mode clair" : "Mode sombre"}
-            >
-              <span aria-hidden="true">{theme === "dark" ? "☀" : "☾"}</span>
-            </button>
-            <button
-              aria-label="Ouvrir le support"
-              onClick={() => setShowSupport(true)}
-            >
-              ?
-            </button>
-            <div className="cs10-account-wrap">
-              <button
-                className="cs10-account-button"
-                onClick={() => setAccountOpen((current) => !current)}
-                aria-expanded={accountOpen}
-                aria-haspopup="menu"
-              >
-                <span className="cs2-avatar">{initials}</span>
-                <span>
-                  <b>{firstName}</b>
-                  <small>
-                    {isAdmin ? "Propriétaire" : isDemo ? "Visiteur" : "Membre"}
-                  </small>
-                </span>
-                <em>⌄</em>
-              </button>
-              {accountOpen && (
-                <div className="cs10-account-menu" role="menu">
-                  <header>
-                    <span className="cs2-avatar">{initials}</span>
-                    <div>
-                      <b>{displayName}</b>
-                      <small>{userEmail || "Session d’aperçu"}</small>
-                    </div>
-                  </header>
-                  <div className="cs10-account-plan">
-                    <span>Plan actuel</span>
-                    <strong>
-                      {complimentaryAccess || isAdmin
-                        ? "Agency · Accès complet"
-                        : isDemo
-                          ? "Aperçu interactif"
-                          : "Bêta gratuite"}
-                    </strong>
-                  </div>
-                  <button
-                    role="menuitem"
-                    onClick={() => changeView("settings")}
-                  >
-                    ⚙ Réglages du compte
-                  </button>
-                  <button role="menuitem" onClick={exit}>
-                    ↗ Voir le site public
-                  </button>
-                  {userId && (
-                    <button
-                      role="menuitem"
-                      className="danger"
-                      onClick={signOut}
-                    >
-                      ⇥ Se déconnecter
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        </header>
-        <div className="cs2-mobile-nav">
-          {navItems
-            .filter((item) =>
-              [
-                "overview",
-                "scripts",
-                "virality",
-                "publish",
-                "settings",
-              ].includes(item.id),
-            )
-            .map((item) => (
-              <button
-                key={item.id}
-                className={view === item.id ? "active" : ""}
-                onClick={() => changeView(item.id)}
-              >
-                <span>{item.icon}</span>
-                {item.label === "Vue d’ensemble"
-                  ? "Accueil"
-                  : item.label === "Studio scripts"
-                    ? "Scripts"
-                    : item.label}
-              </button>
-            ))}
-        </div>
-
-        <section className={`cs2-page cs12-view cs12-view-${view}`} key={view}>
-          {view === "overview" && (
-            <>
-              <div className="cs2-page-title">
-                <div>
-                  <span>{todayLabel}</span>
-                  <h1>Bonjour, {firstName}.</h1>
-                  <p>
-                    {isDemo
-                      ? "Explorez le fonctionnement du cockpit ClipScale."
-                      : "Votre espace est prêt. Voici les priorités de production du jour."}
-                  </p>
-                </div>
-                <button
-                  className="cs2-button"
-                  onClick={() => setShowCreate(true)}
-                >
-                  + Nouvelle mission
-                </button>
-              </div>
-              {!isDemo && (
-                <div className="cs10-command-bar">
-                  <div>
-                    <span className="cs10-command-icon">✦</span>
-                    <div>
-                      <b>Cockpit Agency opérationnel</b>
-                      <small>
-                        Compte sécurisé · accès complet · dernière
-                        synchronisation à l’instant
-                      </small>
-                    </div>
-                  </div>
-                  <div>
-                    <button onClick={() => changeView("virality")}>
-                      ↗ Analyser un clip
-                    </button>
-                    <button onClick={() => changeView("scripts")}>
-                      ✦ Créer un script
-                    </button>
-                    <button onClick={() => changeView("publish")}>
-                      ↑ Préparer une diffusion
-                    </button>
-                  </div>
-                </div>
-              )}
-              <div className="cs2-kpis">
-                <article>
-                  <span>À valider</span>
-                  <strong>
-                    <AnimatedNumber
-                      value={
-                        isDemo
-                          ? 7
-                          : clips.filter((clip) => clip.status === "À valider")
-                              .length
-                      }
-                    />
-                  </strong>
-                  <small>
-                    {isDemo ? "clips en attente" : "aucun clip en attente"}
-                  </small>
-                </article>
-                <article>
-                  <span>En production</span>
-                  <strong>
-                    <AnimatedNumber
-                      value={
-                        isDemo
-                          ? 18
-                          : clips.filter((clip) => clip.status === "Montage")
-                              .length
-                      }
-                    />
-                  </strong>
-                  <small>
-                    {isDemo ? "clips en cours" : "aucune production en cours"}
-                  </small>
-                </article>
-                <article>
-                  <span>À publier</span>
-                  <strong>
-                    <AnimatedNumber
-                      value={
-                        isDemo
-                          ? 4
-                          : clips.filter((clip) => clip.status === "Approuvé")
-                              .length
-                      }
-                    />
-                  </strong>
-                  <small>
-                    {isDemo ? "clips approuvés" : "aucun clip prêt"}
-                  </small>
-                </article>
-                <article>
-                  <span>Missions actives</span>
-                  <strong>
-                    <AnimatedNumber value={missions.length} />
-                  </strong>
-                  <small>
-                    {isDemo ? "dont 1 urgente" : "créez votre première mission"}
-                  </small>
-                </article>
-              </div>
-              <section
-                className="cs2-paid-dashboard"
-                aria-label="Performances du compte"
-              >
-                <div className="cs2-paid-dashboard-head">
-                  <div>
-                    <span>PERFORMANCES · 7 DERNIERS JOURS</span>
-                    <h2>Vos contenus accélèrent.</h2>
-                    <p>
-                      {isDemo
-                        ? "Aperçu des statistiques avancées disponibles dans ClipScale."
-                        : `Statistiques consolidées de votre espace ${complimentaryAccess || isAdmin ? "Agency" : plan}.`}
-                    </p>
-                  </div>
-                  <div className="cs2-live-badge">
-                    <i />{" "}
-                    {isDemo ? "Données d’exemple" : "Données synchronisées"}
-                  </div>
-                </div>
-                <div className="cs2-growth-kpis">
-                  <article>
-                    <span>Vues cumulées</span>
-                    <strong>
-                      <AnimatedNumber value={isDemo ? 38200 : 0} />
-                    </strong>
-                    <small>
-                      {isDemo
-                        ? "↗ 24,8% cette semaine"
-                        : "En attente de vos publications"}
-                    </small>
-                  </article>
-                  <article>
-                    <span>Taux d’engagement</span>
-                    <strong>
-                      <AnimatedNumber
-                        value={isDemo ? 8.4 : 0}
-                        decimals={1}
-                        suffix="%"
-                      />
-                    </strong>
-                    <small>
-                      {isDemo ? "↗ 1,2 point" : "Aucune donnée disponible"}
-                    </small>
-                  </article>
-                  <article>
-                    <span>Abonnés gagnés</span>
-                    <strong>
-                      <AnimatedNumber
-                        value={isDemo ? 1284 : 0}
-                        prefix={isDemo ? "+" : ""}
-                      />
-                    </strong>
-                    <small>
-                      {isDemo
-                        ? "↗ 18,6% cette semaine"
-                        : "Aucune progression mesurée"}
-                    </small>
-                  </article>
-                </div>
-                <div className="cs2-chart-card">
-                  <header>
-                    <div>
-                      <b>Évolution des vues</b>
-                      <span>Instagram · TikTok · YouTube · Facebook</span>
-                    </div>
-                    <strong>—</strong>
-                  </header>
-                  <div className="cs11-empty-chart">
-                    <span>↗</span>
-                    <b>Vos performances apparaîtront ici.</b>
-                    <p>
-                      Connectez un réseau puis publiez votre premier clip pour
-                      commencer le suivi.
-                    </p>
-                    <button onClick={() => changeView("publish")}>
-                      Préparer une publication →
-                    </button>
-                  </div>
-                </div>
-                <div className="cs2-channel-performance">
-                  {[
-                    ["instagram", isDemo ? 42 : 0],
-                    ["tiktok", isDemo ? 31 : 0],
-                    ["youtube", isDemo ? 18 : 0],
-                    ["facebook", isDemo ? 9 : 0],
-                  ].map(([id, share]) => {
-                    const network = socialPlatforms.find(
-                      (item) => item.id === id,
-                    )!;
-                    return (
-                      <article key={String(id)}>
-                        <SocialIcon platform={network} />
-                        <div>
-                          <b>{network.name}</b>
-                          <span>
-                            <i style={{ width: `${share}%` }} />
-                          </span>
-                        </div>
-                        <strong>{share}%</strong>
-                      </article>
-                    );
-                  })}
-                </div>
-              </section>
-              <div className="cs2-grid-2">
-                <article className="cs2-panel">
-                  <div className="cs2-panel-head">
-                    <div>
-                      <h2>Priorités du jour</h2>
-                      <p>Commencez par ces actions.</p>
-                    </div>
-                    <span>{isDemo ? "2 actions" : "0 action"}</span>
-                  </div>
-                  {isDemo ? (
-                    <>
-                      <button
-                        className="cs2-priority"
-                        onClick={() => changeView("clips")}
-                      >
-                        <i className="violet" />
-                        <div>
-                          <b>Valider 7 clips</b>
-                          <span>Nova Studio · Podcast Fondateurs #12</span>
-                        </div>
-                        <em>Voir les clips →</em>
-                      </button>
-                      <button
-                        className="cs2-priority"
-                        onClick={() => changeView("missions")}
-                      >
-                        <i className="blue" />
-                        <div>
-                          <b>Compléter un brief</b>
-                          <span>Maison Lune · Lancement collection été</span>
-                        </div>
-                        <em>Voir la mission →</em>
-                      </button>
-                    </>
-                  ) : (
-                    <div className="cs11-empty-panel">
-                      <span>✓</span>
-                      <b>Aucune action en attente.</b>
-                      <p>
-                        Vos validations et échéances importantes seront
-                        regroupées ici.
-                      </p>
-                    </div>
-                  )}
-                </article>
-                <article className="cs2-panel">
-                  <div className="cs2-panel-head">
-                    <div>
-                      <h2>Production</h2>
-                      <p>Avancement des missions actives.</p>
-                    </div>
-                    <button onClick={() => changeView("missions")}>
-                      Tout voir
-                    </button>
-                  </div>
-                  {missions.length ? (
-                    missions.slice(0, 3).map((mission) => (
-                      <div className="cs2-progress-row" key={mission.id}>
-                        <span className={`cs2-client-dot ${mission.tone}`}>
-                          {mission.client[0]}
-                        </span>
-                        <div>
-                          <b>{mission.title}</b>
-                          <small>{mission.client}</small>
-                        </div>
-                        <div className="cs2-progress">
-                          <i
-                            style={{
-                              width: `${Math.max(10, (Number(mission.clips.split("/")[0]) / Number(mission.clips.split("/")[1])) * 100)}%`,
-                            }}
-                          />
-                        </div>
-                        <strong>{mission.clips}</strong>
-                      </div>
-                    ))
+          Authorization: `Bearer ${session.access_token}`…7703 tokens truncated…           ))
                   ) : (
                     <div className="cs11-empty-panel">
                       <span>▣</span>
@@ -4734,7 +3933,10 @@ function AppShell({
                   <button
                     className="cs2-button cs2-publish-button"
                     disabled={!publishReady}
-                    onClick={() => setShowConnect(true)}
+                    onClick={() => {
+                      setShowConnect(true);
+                      void loadSocialConnections();
+                    }}
                   >
                     {publishMode === "now"
                       ? `Préparer ${selectedPlatforms.length} publication${selectedPlatforms.length > 1 ? "s" : ""}`
@@ -5618,13 +4820,20 @@ function AppShell({
             <div className="cs2-connect-list">
               {socialPlatforms
                 .filter((item) => selectedPlatforms.includes(item.id))
-                .map((item) => (
-                  <div key={item.id}>
+                .map((item) => {
+                  const connection = socialConnections.find((entry) => entry.platform === item.id);
+                  const supported = ["instagram", "facebook", "tiktok", "youtube", "linkedin"].includes(item.id);
+                  const connected = connection?.status === "connected";
+                  return <div key={item.id}>
                     <SocialIcon platform={item} />
-                    <b>{item.name}</b>
-                    <small>À connecter</small>
-                  </div>
-                ))}
+                    <span><b>{item.name}</b><small>{connected ? connection?.provider_account_name || "Compte autorisé" : supported ? connection?.configured ? "Autorisation disponible" : "Configuration serveur requise" : "API non disponible"}</small></span>
+                    {connected ? (
+                      <button type="button" disabled={socialBusy === item.id} onClick={() => void disconnectSocial(item.id)}>Déconnecter</button>
+                    ) : (
+                      <button type="button" disabled={!supported || !connection?.configured || socialBusy === item.id} onClick={() => void connectSocial(item.id)}>{socialBusy === item.id ? "Ouverture…" : "Connecter"}</button>
+                    )}
+                  </div>;
+                })}
             </div>
             <div className="cs2-connect-security">
               <span>✓</span>
@@ -5639,13 +4848,8 @@ function AppShell({
               <button onClick={() => setShowConnect(false)}>
                 Revenir au brouillon
               </button>
-              <button
-                className="cs2-button"
-                onClick={() =>
-                  notify("Intégration des comptes prête à être configurée")
-                }
-              >
-                Configurer les connexions
+              <button className="cs2-button" onClick={() => void loadSocialConnections()}>
+                Actualiser les connexions
               </button>
             </div>
           </div>
